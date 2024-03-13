@@ -1,14 +1,15 @@
 module ForwardDiff_Ext
 
-import GFDomains: GFDomains,
+import SHTnsSpheres:
     analysis_scalar, analysis_scalar!,
     analysis_vector, analysis_vector!,
     analysis_div,
     synthesis_scalar, synthesis_scalar!,
-    synthesis_vector, synthesis_vector!,
+#    synthesis_vector, synthesis_vector!,
     synthesis_spheroidal, synthesis_spheroidal!
 
-using GFDomains.SHTns: allocate_shtns
+using SHTnsSpheres: allocate_shtns
+
 using ForwardDiff: Dual, Partials
 
 #=== Abbreviations for types we commonly dispatch on ===#
@@ -51,18 +52,18 @@ dual(T) = (v,p)->dual(T,v,p)
 dual(T::Type, v::A, p::A) where {A<:Array} = map(Dualizer{T}(), v, p)
 dual(T::Type, v::NT, p::NT) where {NT<:NamedTuple} = map(dual(T), v, p)
 
-function apply(fun, arg, sph, backend)
-    v = fun(value(arg), sph, backend)
-    p = fun(partial(arg), sph, backend)
+function apply(fun, arg, sph)
+    v = fun(value(arg), sph)
+    p = fun(partial(arg), sph)
     return dual(tag(arg), v, p)
 end
 
-analysis_scalar(spat::ScalarSpat, sph, backend) = apply(analysis_scalar, spat, sph, backend)
-analysis_vector(spat::VectorSpat, sph, backend) = apply(analysis_vector, spat, sph, backend)
-analysis_div(spat::VectorSpat, sph, backend) = apply(analysis_div, spat, sph, backend)
-synthesis_scalar(spec::ScalarSpec, sph, backend) = apply(synthesis_scalar, spec, sph, backend)
-synthesis_vector(spec::VectorSpec, sph, backend) = apply(synthesis_vector, spec, sph, backend)
-synthesis_spheroidal(spec::ScalarSpec, sph, backend) = apply(synthesis_spheroidal, spec, sph, backend)
+analysis_scalar(spat::ScalarSpat, sph) = apply(analysis_scalar, spat, sph)
+analysis_vector(spat::VectorSpat, sph) = apply(analysis_vector, spat, sph)
+analysis_div(spat::VectorSpat, sph) = apply(analysis_div, spat, sph)
+synthesis_scalar(spec::ScalarSpec, sph) = apply(synthesis_scalar, spec, sph)
+synthesis_vector(spec::VectorSpec, sph) = apply(synthesis_vector, spec, sph)
+synthesis_spheroidal(spec::ScalarSpec, sph) = apply(synthesis_spheroidal, spec, sph)
 
 #==================== mutating ================#
 
@@ -70,28 +71,28 @@ dual!(T) = (out,v,p)->dual!(T,out,v,p)
 dual!(T::Type, out::A, v, p) where {A<:Array} = map!(Dualizer{T}(), out, v, p)
 dual!(T::Type, out::NT, v, p) where {NT<:NamedTuple} = map!(dual!(T), out, v, p)
 
-function apply!(val::Val, fun!, output, input, sph, backend)
+function apply!(val::Val, fun!, output, input, sph)
     v = allocate_shtns(val, sph) # values
     p = allocate_shtns(val, sph) # partial
-    fun!(v, value(input), sph, backend)
-    fun!(p, partial(input), sph, backend)
+    fun!(v, value(input), sph)
+    fun!(p, partial(input), sph)
     dual!(tag(spec), output, v, p)
     return output
 end
 
-analysis_scalar!(spec::ScalarSpec, spat::VectorSpat, sph, backend) =
-    apply!(Val(:scalar_spec), analysis_scalar!, spec, spat, sph, backend)
+analysis_scalar!(spec::ScalarSpec, spat::VectorSpat, sph) =
+    apply!(Val(:scalar_spec), analysis_scalar!, spec, spat, sph)
 
-analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph, backend) =
-    apply!(Val(:vector_spec), analysis_vector!, spec, spat, sph, backend)
+analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =
+    apply!(Val(:vector_spec), analysis_vector!, spec, spat, sph)
 
-synthesis_scalar!(spat::ScalarSpat, spec::ScalarSpec, sph, backend) =
-    apply!(Val(:scalar_spat), synthesis_scalar!, spec, spat, sph, backend)
+synthesis_scalar!(spat::ScalarSpat, spec::ScalarSpec, sph) =
+    apply!(Val(:scalar_spat), synthesis_scalar!, spec, spat, sph)
 
-synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph, backend) =
-    apply!(Val(:vector_spat), synthesis_vector!, spec, spat, sph, backend)
+synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph) =
+    apply!(Val(:vector_spat), synthesis_vector!, spec, spat, sph)
 
-synthesis_spheroidal!(spat::VectorSpat, spec::ScalarSpec, sph, backend) =
-    apply!(Val(:vector_spat), synthesis_spheroidal!, spec, spat, sph, backend)
+synthesis_spheroidal!(spat::VectorSpat, spec::ScalarSpec, sph) =
+    apply!(Val(:vector_spat), synthesis_spheroidal!, spec, spat, sph)
 
 end

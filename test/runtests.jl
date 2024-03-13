@@ -1,5 +1,6 @@
 using Test, Zygote, ForwardDiff
-using SHTnsSpheres: SHTnsSphere, synthesis_scalar
+using SHTnsSpheres: SHTnsSphere,
+    synthesis_scalar, analysis_scalar, synthesis_spheroidal, analysis_div
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 
@@ -49,17 +50,17 @@ function test_AD(sph, F=Float64)
     end
 
     check_gradient(spec, dspec) do fspec
-        uv = GFDomains.synthesis_spheroidal(fspec, sph)
+        uv = synthesis_spheroidal(fspec, sph)
         u, v = uv
         k = @. u^2+v^2
         uv = map(x->k.*x, uv)
-        GFDomains.analysis_div(uv, sph)
+        analysis_div(uv, sph)
     end
 
     check_gradient(spec, dspec) do fspec
-        u, v = GFDomains.synthesis_spheroidal(fspec, sph)
+        u, v = synthesis_spheroidal(fspec, sph)
         k = @. u^2+v^2
-        GFDomains.analysis_scalar(k, sph)
+        analysis_scalar(k, sph)
     end
 
 end

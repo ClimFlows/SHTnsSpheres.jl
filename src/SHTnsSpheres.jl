@@ -184,8 +184,8 @@ Base.show(io::IO, sph::SHTnsSphere) =
 shtns_alloc_spat(sph, dims...)         = Array{Float64}(undef, sph.nlat, 2*sph.nlat, dims...)
 shtns_alloc_spec(sph, dims...)         = Array{ComplexF64}(undef, sph.nml, dims...)
 
-similar_spec(spat::AF64, sph) = allocate_shtns(Val(:scalar_spec), sph, extra_dims(spat)...)
-similar_spat(spec::AC64, sph) = allocate_shtns(Val(:scalar_spat), sph, extra_dims(spec)...)
+similar_spec(spat::MF64, sph) = allocate_shtns(Val(:scalar_spec), sph,)
+similar_spat(spec::VC64, sph) = allocate_shtns(Val(:scalar_spat), sph)
 
 allocate_shtns(::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(sph, args...)
 allocate_shtns(::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(sph, args...)
@@ -194,11 +194,11 @@ sample_scalar(f, sph::SHTnsSphere) = @. f(sph.x, sph.y, sph.z)
 
 #========= allocate and sample vector fields ========#
 
-const SHTVectorSpat{N} = NamedTuple{(:ucolat, :ulon),                         <:Tuple{<:AF64{N}, <:AF64{N}}}
-const SHTVectorSpec{M} = NamedTuple{(:spheroidal, :toroidal),                 <:Tuple{<:AC64{M}, <:AC64{M}}}
+const SHTVectorSpat{N} = NamedTuple{(:ucolat, :ulon),         <:Tuple{<:AF64{N}, <:AF64{N}}}
+const SHTVectorSpec{M} = NamedTuple{(:spheroidal, :toroidal), <:Tuple{<:AC64{M}, <:AC64{M}}}
 
-similar_spec(spat::SHTVectorSpat, sph) = allocate_shtns(Val(:vector_spec), sph, extra_dims(spat.ulon)...)
-similar_spat(spec::SHTVectorSpec, sph) = allocate_shtns(Val(:vector_spat), sph, extra_dims(spec.spheroidal)...)
+similar_spec(spat::SHTVectorSpat, sph) = allocate_shtns(Val(:vector_spec), sph)
+similar_spat(spec::SHTVectorSpec, sph) = allocate_shtns(Val(:vector_spat), sph)
 
 allocate_shtns(::Val{:vector_spat}, sph::SHTnsSphere, args...) = (
     ucolat = shtns_alloc_spat(sph, args...),
@@ -217,10 +217,57 @@ end
 
 #========= scalar synthesis ========#
 
-synthesis_scalar(spec::AC64, sph::SHTnsSphere) = (
-    synthesis_scalar!(similar_spat(spec, sph), spec, sph) )
-
-synthesis_scalar!(spat::MF64, spec::VC64, sph::SHTnsSphere) =
+function synthesis_scalar!(spat::MF64, spec::VC64, sph::SHTnsSphere)
     SH_to_spat(sph.ptr, spec, spat)
+    return spat
+end
+
+synthesis_scalar(spec::AC64, sph::SHTnsSphere) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
+
+#========= scalar analysis ========#
+
+function analysis_scalar!(spec::VC64, spat::MF64, sph::SHTnsSphere)
+    spat_to_SH(sph.ptr, spat, spec)
+    return spec
+end
+
+analysis_scalar(spat::AF64, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
+
+#========= vector analysis ========#
+
+function analysis_vector!(vec::SHTVectorSpec, (ucolat,ulon)::SHTVectorSpat, sph::SHTnsSphere)
+    spat_to_SHsphtor(sph.ptr, ucolat, ulon, vec.spheroidal, vec.toroidal)
+    return vec
+end
+
+analysis_vector(spat::SHTVectorSpat, sph::SHTnsSphere) = analysis_vector!(similar_spec(spat, sph), spat, sph)
+
+#========= spheroidal synthesis (gradient) =========#
+
+function synthesis_spheroidal!(vec::SHTVectorSpat, spec::VC64, sph::SHTnsSphere)
+    SHsph_to_spat(sph.ptr, spec, vec.ucolat, vec.ulon)
+    return vec
+end
+
+synthesis_spheroidal(spec::VC64, sph::SHTnsSphere) =
+    synthesis_spheroidal!(allocate_shtns(Val(:vector_spat), sph), spec, sph)
+
+#========= divergence ========#
+
+function divergence!(spec::VC64, vec::SHTVectorSpec, sph::SHTnsSphere)
+    spheroidal, laplace = vec.spheroidal, sph.laplace
+    @. spec = spheroidal*laplace
+    return spec
+end
+
+function divergence(vec::SHTVectorSpec, sph::SHTnsSphere)
+    spheroidal, laplace = vec.spheroidal, sph.laplace
+    return spheroidal.*laplace
+end
+
+function analysis_div(spat::SHTVectorSpat, sph::SHTnsSphere)
+    (; spheroidal) = analysis_vector(spat, sph)
+    return spheroidal .* sph.laplace
+end
 
 end

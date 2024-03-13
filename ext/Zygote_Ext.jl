@@ -1,12 +1,12 @@
 module Zygote_Ext
 using Zygote: @adjoint
 
-import GFDomains:
+import SHTnsSpheres:
     analysis_scalar,
     analysis_vector, # TODO
     analysis_div,
     synthesis_scalar,
-    synthesis_vector, # TODO
+#    synthesis_vector, # TODO
     synthesis_spheroidal
 
 function scale_m0!(spec, sph, fac)
@@ -26,39 +26,39 @@ protect(x::NamedTuple) = map(protect, x)
 
 #=================== scalar ==============#
 
-@adjoint analysis_scalar(spat, sph, backend) = analysis_scalar(protect(spat), sph, backend),
-(spec) -> adjoint_analysis_scalar(protect(spec), sph, backend)
+@adjoint analysis_scalar(spat, sph) = analysis_scalar(protect(spat), sph),
+(spec) -> adjoint_analysis_scalar(protect(spec), sph)
 
-@adjoint synthesis_scalar(spec, sph, backend) = synthesis_scalar(protect(spec), sph, backend),
-(spat) -> adjoint_synthesis_scalar(protect(spat), sph, backend)
+@adjoint synthesis_scalar(spec, sph) = synthesis_scalar(protect(spec), sph),
+(spat) -> adjoint_synthesis_scalar(protect(spat), sph)
 
-function adjoint_analysis_scalar(spec, sph, backend)
+function adjoint_analysis_scalar(spec, sph)
     scale_m0!(spec, sph, 2.0)
-    return synthesis_scalar(spec, sph, backend), nothing, nothing
+    return synthesis_scalar(spec, sph), nothing, nothing
 end
 
-function adjoint_synthesis_scalar(spat, sph, backend)
-    spec = analysis_scalar(spat, sph, backend)
+function adjoint_synthesis_scalar(spat, sph)
+    spec = analysis_scalar(spat, sph)
     scale_m0!(spec, sph, 0.5)
     return spec, nothing, nothing
 end
 
 #================= vector =================#
 
-@adjoint analysis_div(uv, sph, backend) = analysis_div(protect(uv), sph, backend),
-(div_spec) -> adjoint_analysis_div(protect(div_spec), sph, backend)
+@adjoint analysis_div(uv, sph) = analysis_div(protect(uv), sph),
+(div_spec) -> adjoint_analysis_div(protect(div_spec), sph)
 
-@adjoint synthesis_spheroidal(phi_spec, sph, backend) = synthesis_spheroidal(protect(phi_spec), sph, backend),
-(uv_spat) -> adjoint_synthesis_spheroidal(protect(uv_spat), sph, backend)
+@adjoint synthesis_spheroidal(phi_spec, sph) = synthesis_spheroidal(protect(phi_spec), sph),
+(uv_spat) -> adjoint_synthesis_spheroidal(protect(uv_spat), sph)
 
-function adjoint_analysis_div(spec, sph, backend)
+function adjoint_analysis_div(spec, sph)
     scale_m0!(spec, sph, 2.0)
-    ucolat, ulon = synthesis_spheroidal(spec, sph, backend)
+    ucolat, ulon = synthesis_spheroidal(spec, sph)
     return (ucolat = -ucolat, ulon = -ulon), nothing, nothing
 end
 
-function adjoint_synthesis_spheroidal(uv_spat, sph, backend)
-    spec = analysis_div(uv_spat, sph, backend)
+function adjoint_synthesis_spheroidal(uv_spat, sph)
+    spec = analysis_div(uv_spat, sph)
     spec = scale_m0!(spec, sph, 0.5)
     return -spec, nothing, nothing
 end
