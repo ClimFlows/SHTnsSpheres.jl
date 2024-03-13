@@ -2,7 +2,7 @@
 CurrentModule = SHTnsSpheres
 ```
 
-# SHTnsSphere
+# SHTnsSpheres
 
 Documentation for [SHTnsSpheres](https://github.com/ClimFlows/SHTnsSpheres.jl).
 
