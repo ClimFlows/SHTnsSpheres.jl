@@ -3,6 +3,9 @@ uuid = "9e5c175a-5132-4517-85a1-2957ec255f89"
 authors = ["The ClimFlows contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+SHTns_jll = "daf09cc5-9ab3-509e-9618-0b89086eb825"
+
 [compat]
 julia = "1.8"
 

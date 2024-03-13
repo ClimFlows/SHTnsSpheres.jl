@@ -1,5 +1,5 @@
-using Zygote, ForwardDiff, SHTns_jll, GFDomains, GFBackends
-using Test
+using Test, Zygote, ForwardDiff
+using SHTnsSpheres: SHTnsSphere, synthesis_scalar
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 
@@ -32,10 +32,10 @@ end
 
 #========= Check consistency of adjoint and tangent =======#
 
-function test_AD(sph, mgr, F=Float64)
+function test_AD(sph, F=Float64)
     @show sph
-    synthesis(f) = GFDomains.synthesis_scalar(copy(f), sph, mgr)
-    analysis(f) = GFDomains.analysis_scalar(copy(f), sph, mgr)
+    synthesis(f) = synthesis_scalar(copy(f), sph)
+    analysis(f) = analysis_scalar(copy(f), sph)
 
     (; x,y,z) = sph
     spat = @. (y+2z)^2
@@ -49,22 +49,21 @@ function test_AD(sph, mgr, F=Float64)
     end
 
     check_gradient(spec, dspec) do fspec
-        uv = GFDomains.synthesis_spheroidal(fspec, sph, mgr)
+        uv = GFDomains.synthesis_spheroidal(fspec, sph)
         u, v = uv
         k = @. u^2+v^2
         uv = map(x->k.*x, uv)
-        GFDomains.analysis_div(uv, sph, mgr)
+        GFDomains.analysis_div(uv, sph)
     end
 
     check_gradient(spec, dspec) do fspec
-        u, v = GFDomains.synthesis_spheroidal(fspec, sph, mgr)
+        u, v = GFDomains.synthesis_spheroidal(fspec, sph)
         k = @. u^2+v^2
-        GFDomains.analysis_scalar(k, sph, mgr)
+        GFDomains.analysis_scalar(k, sph)
     end
 
 end
 
 lmax = 32
-sph = GFDomains.SHTns_sphere(lmax)
-mgr = GFBackends.PlainCPU()
-@testset "Autodiff for SHTns" test_AD(sph, mgr)
+sph = SHTnsSphere(lmax)
+@testset "Autodiff for SHTns" test_AD(sph)
