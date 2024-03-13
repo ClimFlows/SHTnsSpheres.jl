@@ -154,4 +154,11 @@ end
 
 curl(vec::SHTVectorSpec, sph::SHTnsSphere) = vec.toroidal .* sph.laplace
 
+#========== for Julia <1.9 ==========#
+
+using PackageExtensionCompat
+function __init__()
+    @require_extensions
+end
+
 end
