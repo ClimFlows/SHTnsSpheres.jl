@@ -6,9 +6,9 @@ DocMeta.setdocmeta!(SHTnsSphere, :DocTestSetup, :(using SHTnsSphere); recursive=
 makedocs(;
     modules=[SHTnsSphere],
     authors="The ClimFlows contributors",
-    sitename="SHTnsSphere.jl",
+    sitename="SHTnsSpheres.jl",
     format=Documenter.HTML(;
-        canonical="https://ClimFlows.github.io/SHTnsSphere.jl",
+        canonical="https://ClimFlows.github.io/SHTnsSpheres.jl",
         edit_link="main",
         assets=String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/ClimFlows/SHTnsSphere.jl",
+    repo="github.com/ClimFlows/SHTnsSpheres.jl",
     devbranch="main",
 )

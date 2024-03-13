@@ -1,4 +1,4 @@
-module SHTnsSphere
+module SHTnsSpheres
 
 # Write your package code here.
 

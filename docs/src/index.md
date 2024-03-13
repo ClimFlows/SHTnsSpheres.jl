@@ -4,7 +4,7 @@ CurrentModule = SHTnsSphere
 
 # SHTnsSphere
 
-Documentation for [SHTnsSphere](https://github.com/ClimFlows/SHTnsSphere.jl).
+Documentation for [SHTnsSphere](https://github.com/ClimFlows/SHTnsSpheres.jl).
 
 ```@index
 ```
