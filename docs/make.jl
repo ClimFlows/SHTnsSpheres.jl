@@ -1,10 +1,10 @@
-using SHTnsSphere
+using SHTnsSpheres
 using Documenter
 
-DocMeta.setdocmeta!(SHTnsSphere, :DocTestSetup, :(using SHTnsSphere); recursive=true)
+DocMeta.setdocmeta!(SHTnsSpheres, :DocTestSetup, :(using SHTnsSpheres); recursive=true)
 
 makedocs(;
-    modules=[SHTnsSphere],
+    modules=[SHTnsSpheres],
     authors="The ClimFlows contributors",
     sitename="SHTnsSpheres.jl",
     format=Documenter.HTML(;

@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = SHTnsSphere
+CurrentModule = SHTnsSpheres
 ```
 
 # SHTnsSphere
 
-Documentation for [SHTnsSphere](https://github.com/ClimFlows/SHTnsSpheres.jl).
+Documentation for [SHTnsSpheres](https://github.com/ClimFlows/SHTnsSpheres.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [SHTnsSphere]
+Modules = [SHTnsSpheres]
 ```
