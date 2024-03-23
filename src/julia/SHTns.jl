@@ -29,8 +29,8 @@ end
 
 # A=Array, M=Matrix, V=Vector
 const ArrayOrSub{N,F} = StridedArray{F,N}
-const AF64{N} = ArrayOrSub{N,Float64}
-const AC64{N} = ArrayOrSub{N,ComplexF64}
+const AF64{N} = Array{Float64,N} # ArrayOrSub{N,Float64}
+const AC64{N} = Array{ComplexF64,N} # ArrayOrSub{N,ComplexF64}
 
 const MF64 = AF64{2}
 const VC64 = AC64{1}
