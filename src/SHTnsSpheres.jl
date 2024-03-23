@@ -8,6 +8,8 @@ end
 
 using .priv
 
+include("julia/util.jl")
+
 #==================================================================#
 
 struct SHTnsSphere
@@ -92,10 +94,10 @@ allocate_shtns(::Val{:vector_spec}, sph::SHTnsSphere, args...) = (
     toroidal = shtns_alloc_spec(sph, args...) )
 
 function sample_vector(ulonlat, sph::SHTnsSphere)
-    uv = @. ulonlat(sph.x, sph.y, sph.z)
-    return (
-        ucolat = [-v for (u,v) in uv],
-        ulon = [u for (u,v) in uv] )
+    (; x, y, z, lon, lat) = sph
+    ucolat = @. -getindex(ulonlat(x, y, z, lon, lat), 2)
+    ulon = @. getindex(ulonlat(x, y, z, lon, lat), 1)
+    return (; ucolat, ulon)
 end
 
 #========= scalar synthesis ========#

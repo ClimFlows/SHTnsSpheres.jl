@@ -3,6 +3,8 @@ using SHTnsSpheres: SHTnsSphere,
     synthesis_scalar, analysis_scalar, synthesis_spheroidal, analysis_div
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
+Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
+Base.copy(t::NamedTuple) = map(copy, t)
 
 #========= Helper functions ==========#
 
@@ -29,6 +31,28 @@ function check_gradient(fun, state, dstate, args...)
     #    @info fun fwd_exact fwd_grad
     #    @info fun bwd_exact bwd_grad
     return nothing
+end
+
+#========= Check that synthesis and analysis are inverses =======#
+
+## Returns a smooth vector field a∇x+b∇y+c∇z with a,b,c smooth scalar fields
+function velocity(x,y,z,lon,lat)
+    # ∇x = ∇(cosλ cosϕ) = -sinλ, -cosλ sinϕ
+    # ∇y = ∇(sinλ cosϕ) = cosλ, -sinλ sinϕ
+    # ∇z = ∇ sinϕ = 0, cos ϕ
+    a, b, c = (y+2z)^2, (z+2y)^2, (x+2z)^2
+    a, b, c = (0,0,1)
+    ulon = b*cos(lon)-a*sin(lon)
+    ulat = c*cos(lat)-sin(lat)*(a*cos(lon)+b*sin(lon))
+    return ulon, ulat
+end
+
+function test_inv(sph, F=Float64)
+    uv = sample_vector(velocity, sph)
+    spec = analysis_vector!(void, uv, sph)
+    uv2 = synthesis_vector!(void, spec, sph)
+    @test uv.ulon ≈ uv2.ulon
+    @test uv.ucolat ≈ uv2.ucolat
 end
 
 #========= Check consistency of adjoint and tangent =======#
