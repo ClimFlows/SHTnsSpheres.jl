@@ -1,6 +1,6 @@
 using Test, Zygote, ForwardDiff
-using SHTnsSpheres: SHTnsSphere,
-    synthesis_scalar, analysis_scalar, synthesis_spheroidal, analysis_div
+using SHTnsSpheres: SHTnsSphere, void,
+    synthesis_scalar!, analysis_scalar, synthesis_spheroidal, analysis_div
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
@@ -59,7 +59,7 @@ end
 
 function test_AD(sph, F=Float64)
     @show sph
-    synthesis(f) = synthesis_scalar(copy(f), sph)
+    synthesis(f) = synthesis_scalar!(void, copy(f), sph)
     analysis(f) = analysis_scalar(copy(f), sph)
 
     (; x,y,z) = sph

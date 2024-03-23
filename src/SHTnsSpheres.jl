@@ -106,8 +106,7 @@ function synthesis_scalar!(spat::MF64, spec::VC64, sph::SHTnsSphere)
     priv.SH_to_spat(sph.ptr, spec, spat)
     return spat
 end
-
-synthesis_scalar(spec::AC64, sph::SHTnsSphere) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
+synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
 
 #========= scalar analysis ========#
 
