@@ -3,7 +3,7 @@ module ForwardDiff_Ext
 import SHTnsSpheres:
     Void, void, In,
     similar_spec, similar_spat, allocate_shtns,
-    analysis_scalar, analysis_scalar!,
+    analysis_scalar!,
     analysis_vector, analysis_vector!,
     analysis_div,
     synthesis_scalar!,
@@ -27,15 +27,14 @@ tag(::ScalarSpec{T}) where T = T
 tag(::VectorSpat{T}) where T = T
 tag(::VectorSpec{T}) where T = T
 
-similar_spec(spat::DualF64{1,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spec), sph)
-similar_spat(spec::DualC64{1,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spat), sph)
+similar_spec(::DualF64{2,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spec), sph)
+similar_spat(::DualC64{1,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spat), sph)
 
 allocate_shtns(T, ::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(T, sph, args...)
 allocate_shtns(T, ::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(T, sph, args...)
 
 shtns_alloc_spat(F, sph, dims...)         = Array{F}(undef, sph.nlat, 2*sph.nlat, dims...)
 shtns_alloc_spec(F, sph, dims...)         = Array{Complex{F}}(undef, sph.nml, dims...)
-
 
 #========= low-level helpers to separate then recombine value and partials ===========#
 
@@ -90,9 +89,9 @@ function apply!(val::Val, fun!, output, input, sph)
     return output
 end
 
-analysis_scalar!(spec::ScalarSpec, spat::VectorSpat, sph) =
+analysis_scalar!(spec::ScalarSpec, spat::ScalarSpat, sph) =
     apply!(Val(:scalar_spec), analysis_scalar!, spec, spat, sph)
-analysis_scalar!(::Void, spat::VectorSpat, sph) =
+analysis_scalar!(::Void, spat::ScalarSpat, sph) =
     apply!(Val(:scalar_spec), analysis_scalar!, similar_spec(spat, sph), spat, sph)
 
 analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =

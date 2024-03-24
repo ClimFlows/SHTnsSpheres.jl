@@ -75,7 +75,8 @@ similar_spat(spec::VC64, sph) = allocate_shtns(Val(:scalar_spat), sph)
 allocate_shtns(::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(sph, args...)
 allocate_shtns(::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(sph, args...)
 
-sample_scalar(f, sph::SHTnsSphere) = @. f(sph.x, sph.y, sph.z)
+sample_scalar!(spat, f, sph::SHTnsSphere) = @. spat = f(sph.x, sph.y, sph.z, sph.lon, sph.lat)
+sample_scalar!(::Void, f, sph::SHTnsSphere) = @. f(sph.x, sph.y, sph.z, sph.lon, sph.lat)
 
 #========= allocate and sample vector fields ========#
 
@@ -115,7 +116,7 @@ function analysis_scalar!(spec::VC64, spat::MF64, sph::SHTnsSphere)
     return spec
 end
 
-analysis_scalar(spat::AF64, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
+analysis_scalar!(::Void, spat::AF64, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
 
 #========= vector analysis ========#
 

@@ -2,7 +2,7 @@ module Zygote_Ext
 using Zygote: @adjoint
 
 import SHTnsSpheres: void, Void,
-    analysis_scalar,
+    analysis_scalar!,
     analysis_vector, # TODO
     analysis_div,
     synthesis_scalar!,
@@ -26,21 +26,23 @@ protect(x::NamedTuple) = map(protect, x)
 
 #=================== scalar ==============#
 
-@adjoint analysis_scalar(spat, sph) = analysis_scalar(protect(spat), sph),
-(spec) -> adjoint_analysis_scalar(protect(spec), sph)
+@adjoint analysis_scalar!(::Void, spat, sph) =
+    analysis_scalar!(void, protect(spat), sph),
+    (spec -> adjoint_analysis_scalar(protect(spec), sph))
 
-@adjoint synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(void, protect(spec), sph),
-(toto -> (nothing, adjoint_synthesis_scalar(protect(toto), sph), nothing, nothing))
+@adjoint synthesis_scalar!(::Void, spec, sph) =
+    synthesis_scalar!(void, protect(spec), sph),
+    (spat -> adjoint_synthesis_scalar(protect(spat), sph))
 
 function adjoint_analysis_scalar(spec, sph)
     scale_m0!(spec, sph, 2.0)
-    return synthesis_scalar!(void, spec, sph), nothing, nothing
+    return nothing, synthesis_scalar!(void, spec, sph), nothing, nothing
 end
 
 function adjoint_synthesis_scalar(spat, sph)
-    spec = analysis_scalar(spat, sph)
+    spec = analysis_scalar!(void, spat, sph)
     scale_m0!(spec, sph, 0.5)
-    return spec
+    return nothing, spec, nothing, nothing
 end
 
 #================= vector =================#

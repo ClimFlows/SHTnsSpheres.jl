@@ -1,6 +1,7 @@
 using Test, Zygote, ForwardDiff
 using SHTnsSpheres: SHTnsSphere, void,
-    synthesis_scalar!, analysis_scalar, synthesis_spheroidal, analysis_div
+    sample_scalar!,
+    synthesis_scalar!, analysis_scalar!, synthesis_spheroidal, analysis_div
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
@@ -47,20 +48,30 @@ function velocity(x,y,z,lon,lat)
     return ulon, ulat
 end
 
+scalar(x,y,z,lon,lat) = (x*y*z)^3
+
 function test_inv(sph, F=Float64)
+    spat = sample_scalar!(void, scalar, sph)
+    spec = analysis_scalar!(void, copy(spat), sph) # modifies input !
+    spat2 = synthesis_scalar!(void, spec, sph) # pure
+    spec2 = analysis_scalar!(void, copy(spat2), sph) # modifies input !
+    @test spat ≈ spat2
+    @test spec ≈ spec2
+#=
     uv = sample_vector(velocity, sph)
     spec = analysis_vector!(void, uv, sph)
     uv2 = synthesis_vector!(void, spec, sph)
     @test uv.ulon ≈ uv2.ulon
     @test uv.ucolat ≈ uv2.ucolat
+=#
 end
 
 #========= Check consistency of adjoint and tangent =======#
 
 function test_AD(sph, F=Float64)
     @show sph
-    synthesis(f) = synthesis_scalar!(void, copy(f), sph)
-    analysis(f) = analysis_scalar(copy(f), sph)
+    synthesis(f) = synthesis_scalar!(void, f, sph)
+    analysis(f) = analysis_scalar!(void, copy(f), sph) # modifies input !
 
     (; x,y,z) = sph
     spat = @. (y+2z)^2
@@ -84,11 +95,12 @@ function test_AD(sph, F=Float64)
     check_gradient(spec, dspec) do fspec
         u, v = synthesis_spheroidal(fspec, sph)
         k = @. u^2+v^2
-        analysis_scalar(k, sph)
+        analysis(k)
     end
 
 end
 
 lmax = 32
 sph = SHTnsSphere(lmax)
+@testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
