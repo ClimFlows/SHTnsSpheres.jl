@@ -3,11 +3,9 @@ module ForwardDiff_Ext
 import SHTnsSpheres:
     Void, void, In,
     similar_spec, similar_spat, allocate_shtns,
-    analysis_scalar!,
-    analysis_vector, analysis_vector!,
+    analysis_scalar!, synthesis_scalar!,
+    analysis_vector!, synthesis_vector!,
     analysis_div,
-    synthesis_scalar!,
-#    synthesis_vector, synthesis_vector!,
     synthesis_spheroidal, synthesis_spheroidal!
 
 using ForwardDiff: Dual, Partials
