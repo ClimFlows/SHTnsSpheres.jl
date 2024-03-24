@@ -3,10 +3,10 @@ using Zygote: @adjoint
 
 import SHTnsSpheres: void, Void,
     analysis_scalar!,
-    analysis_vector, # TODO
+    analysis_vector!, # TODO
     analysis_div,
     synthesis_scalar!,
-#    synthesis_vector, # TODO
+    synthesis_vector!, # TODO
     synthesis_spheroidal
 
 function scale_m0!(spec, sph, fac)

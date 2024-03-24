@@ -94,7 +94,7 @@ allocate_shtns(::Val{:vector_spec}, sph::SHTnsSphere, args...) = (
     spheroidal = shtns_alloc_spec(sph, args...),
     toroidal = shtns_alloc_spec(sph, args...) )
 
-function sample_vector(ulonlat, sph::SHTnsSphere)
+function sample_vector!(::Void, ulonlat, sph::SHTnsSphere)
     (; x, y, z, lon, lat) = sph
     ucolat = @. -getindex(ulonlat(x, y, z, lon, lat), 2)
     ulon = @. getindex(ulonlat(x, y, z, lon, lat), 1)
@@ -120,18 +120,27 @@ analysis_scalar!(::Void, spat::AF64, sph::SHTnsSphere) = analysis_scalar!(simila
 
 #========= vector analysis ========#
 
-function analysis_vector!(vec::SHTVectorSpec, (ucolat,ulon)::SHTVectorSpat, sph::SHTnsSphere)
-    priv.spat_to_SHsphtor(sph.ptr, ucolat, ulon, vec.spheroidal, vec.toroidal)
-    return vec
+function analysis_vector!(spec::SHTVectorSpec, spat::SHTVectorSpat, sph::SHTnsSphere)
+    priv.spat_to_SHsphtor(sph.ptr, spat.ucolat, spat.ulon, spec.spheroidal, spec.toroidal)
+    return spec
 end
 
-analysis_vector(spat::SHTVectorSpat, sph::SHTnsSphere) = analysis_vector!(similar_spec(spat, sph), spat, sph)
+analysis_vector!(::Void, spat::SHTVectorSpat, sph::SHTnsSphere) = analysis_vector!(similar_spec(spat, sph), spat, sph)
+
+#========= vector synthesis ========#
+
+function synthesis_vector!(spat::SHTVectorSpat, spec::SHTVectorSpec, sph::SHTnsSphere)
+    priv.SHsphtor_to_spat(sph.ptr, spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
+    return spat
+end
+
+synthesis_vector!(::Void, spec::SHTVectorSpec, sph::SHTnsSphere) = synthesis_vector!(similar_spat(spec, sph), spec, sph)
 
 #========= spheroidal synthesis (gradient) =========#
 
-function synthesis_spheroidal!(vec::SHTVectorSpat, spec::VC64, sph::SHTnsSphere)
-    priv.SHsph_to_spat(sph.ptr, spec, vec.ucolat, vec.ulon)
-    return vec
+function synthesis_spheroidal!(spat::SHTVectorSpat, spec::VC64, sph::SHTnsSphere)
+    priv.SHsph_to_spat(sph.ptr, spec, spat.ucolat, spat.ulon)
+    return spat
 end
 
 synthesis_spheroidal(spec::VC64, sph::SHTnsSphere) =
@@ -139,22 +148,22 @@ synthesis_spheroidal(spec::VC64, sph::SHTnsSphere) =
 
 #========= divergence ========#
 
-function divergence!(spec::VC64, vec::SHTVectorSpec, sph::SHTnsSphere)
-    spheroidal, laplace = vec.spheroidal, sph.laplace
+function divergence!(spec::VC64, spat::SHTVectorSpec, sph::SHTnsSphere)
+    spheroidal, laplace = spat.spheroidal, sph.laplace
     @. spec = spheroidal*laplace
     return spec
 end
 
-divergence(vec::SHTVectorSpec, sph::SHTnsSphere) = vec.spheroidal .* sph.laplace
+divergence(spec::SHTVectorSpec, sph::SHTnsSphere) = spec.spheroidal .* sph.laplace
 
 function analysis_div(spat::SHTVectorSpat, sph::SHTnsSphere)
-    (; spheroidal) = analysis_vector(spat, sph)
+    (; spheroidal) = analysis_vector!(void, spat, sph)
     return spheroidal .* sph.laplace
 end
 
 #========= curl ========#
 
-curl(vec::SHTVectorSpec, sph::SHTnsSphere) = vec.toroidal .* sph.laplace
+curl(spec::SHTVectorSpec, sph::SHTnsSphere) = spec.toroidal .* sph.laplace
 
 #========== for Julia <1.9 ==========#
 
