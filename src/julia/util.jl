@@ -1,7 +1,3 @@
-# void type
-
-const void = Val(:void)
-const Void = Val{:void}
 const Out{T} = Union{Void,T}
 
 # isvoid(x) = isa(x, Void)

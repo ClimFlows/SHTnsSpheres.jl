@@ -1,5 +1,7 @@
 module SHTnsSpheres
 
+using MutatingOrNot: void, Void
+
 module priv
 using SHTns_jll
 include("julia/SHTns.jl")
