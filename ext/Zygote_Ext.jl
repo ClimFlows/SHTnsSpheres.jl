@@ -1,7 +1,7 @@
 module Zygote_Ext
 using Zygote: @adjoint
 
-import SHTnsSpheres: void, Void,
+import SHTnsSpheres: void, Void, InOut,
     analysis_scalar!,
     analysis_vector!, # TODO
     synthesis_scalar!,
@@ -16,13 +16,12 @@ function scale_m0!(spec, sph, fac)
 end
 
 """
-SHTns usually overwrites the input array.
-This may confuse Zygote which assumes pure functions.
-So we make copies of input arguments.
+    y = protect(x)
+Makes sure x is not modified even if x::InOut. Used internally for reverse AD.
 """
-protect(x::AbstractArray) = copy(x)
 protect(x::NamedTuple) = map(protect, x)
-protect(::Nothing) = nothing
+protect(x::InOut) = x.data
+protect(x) = x
 
 #=================== scalar ==============#
 

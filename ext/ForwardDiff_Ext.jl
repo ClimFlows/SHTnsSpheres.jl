@@ -2,9 +2,10 @@ module ForwardDiff_Ext
 
 import SHTnsSpheres:
     Void, void, In,
-    similar_spec, similar_spat, allocate_shtns,
+    similar_spec, similar_spat, shtns_alloc,
     analysis_scalar!, synthesis_scalar!,
-    analysis_vector!, synthesis_vector!, synthesis_spheroidal!
+    analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
+    SHTVectorSpat, SHTVectorSpec
 
 using ForwardDiff: Dual, Partials
 
@@ -22,15 +23,6 @@ tag(::ScalarSpat{T}) where T = T
 tag(::ScalarSpec{T}) where T = T
 tag(::VectorSpat{T}) where T = T
 tag(::VectorSpec{T}) where T = T
-
-similar_spec(::DualF64{2,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spec), sph)
-similar_spat(::DualC64{1,T,N}, sph) where {T,N} = allocate_shtns(Dual{T,Float64,N}, Val(:scalar_spat), sph)
-
-allocate_shtns(T, ::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(T, sph, args...)
-allocate_shtns(T, ::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(T, sph, args...)
-
-shtns_alloc_spat(F, sph, dims...)         = Array{F}(undef, sph.nlat, 2*sph.nlat, dims...)
-shtns_alloc_spec(F, sph, dims...)         = Array{Complex{F}}(undef, sph.nml, dims...)
 
 #========= low-level helpers to separate then recombine value and partials ===========#
 
@@ -74,11 +66,15 @@ synthesis_spheroidal!(::Void, spec::ScalarSpec, sph) = apply(synthesis_spheroida
 
 dual!(T) = (out,v,p)->dual!(T,out,v,p)
 dual!(T::Type, out::A, v, p) where {A<:Array} = map!(Dualizer{T}(), out, v, p)
-dual!(T::Type, out::NT, v, p) where {NT<:NamedTuple} = map!(dual!(T), out, v, p)
+function dual!(T::Type, out::SHTVectorSpec, v::SHTVectorSpec, p::SHTVectorSpec)
+    dual!(T, out.toroidal, v.toroidal, p.toroidal)
+    dual!(T, out.spheroidal, v.spheroidal, p.spheroidal)
+    return out
+end
 
 function apply!(val::Val, fun!, output, input, sph)
-    v = allocate_shtns(val, sph) # values
-    p = allocate_shtns(val, sph) # partial
+    v = shtns_alloc(Float64, val, sph) # values
+    p = shtns_alloc(Float64, val, sph) # partial
     fun!(v, value(input), sph)
     fun!(p, partial(input), sph)
     dual!(tag(input), output, v, p)

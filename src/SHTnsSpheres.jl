@@ -63,38 +63,45 @@ struct SHTnsSphere
     end
 end
 
-#========= allocate and sample scalar fields ========#
-
 Base.show(io::IO, sph::SHTnsSphere) =
     print(io, "SHTns_sphere(T$(sph.lmax), nlon=$(sph.nlon), nlat=$(sph.nlat))")
 
-shtns_alloc_spat(sph, dims...)         = Array{Float64}(undef, sph.nlat, 2*sph.nlat, dims...)
-shtns_alloc_spec(sph, dims...)         = Array{ComplexF64}(undef, sph.nml, dims...)
+#========= allocate ========#
 
-similar_spec(spat::MF64, sph) = allocate_shtns(Val(:scalar_spec), sph,)
-similar_spat(spec::VC64, sph) = allocate_shtns(Val(:scalar_spat), sph)
+const SHTVectorSpat{F<:Real, N} = @NamedTuple{ucolat::Array{F,N}, ulon::Array{F,N}}
+const SHTVectorSpec{F<:Real, N} = @NamedTuple{spheroidal::Array{Complex{F},N}, toroidal::Array{Complex{F},N}}
 
-allocate_shtns(::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(sph, args...)
-allocate_shtns(::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(sph, args...)
+Base.show(io::IO, ::Type{SHTVectorSpat{F,N}}) where {F,N} =
+    print(io, "SHTVectorSpat{$F,$N}")
+Base.show(io::IO, ::Type{SHTVectorSpec{F,N}}) where {F,N} =
+    print(io, "SHTVectorSpec{$F,$N}")
+
+similar_spec(x::InOut, sph) = similar_spec(readable(x), sph)
+similar_spec(::Matrix{F}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph)
+similar_spec(::SHTVectorSpat{F}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph)
+
+similar_spat(x::InOut, sph) = similar_spat(readable(x), sph)
+similar_spat(::Vector{Complex{F}}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph)
+similar_spat(::SHTVectorSpec{F}, sph) where F = shtns_alloc(F, Val(:vector_spat), sph)
+
+shtns_alloc(F, ::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(F, sph, args...)
+shtns_alloc(F, ::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(F, sph, args...)
+
+shtns_alloc(F, ::Val{:vector_spat}, sph::SHTnsSphere, args...) = (
+    ucolat = shtns_alloc_spat(F, sph, args...),
+    ulon = shtns_alloc_spat(F, sph, args...) )
+
+shtns_alloc(F, ::Val{:vector_spec}, sph::SHTnsSphere, args...) = (
+    spheroidal = shtns_alloc_spec(F, sph, args...),
+    toroidal = shtns_alloc_spec(F, sph, args...) )
+
+shtns_alloc_spat(F, sph, dims...) = Array{F}(undef, sph.nlat, 2*sph.nlat, dims...)
+shtns_alloc_spec(F, sph, dims...) = Array{Complex{F}}(undef, sph.nml, dims...)
+
+#========= sample ========#
 
 sample_scalar!(spat, f, sph::SHTnsSphere) = @. spat = f(sph.x, sph.y, sph.z, sph.lon, sph.lat)
 sample_scalar!(::Void, f, sph::SHTnsSphere) = @. f(sph.x, sph.y, sph.z, sph.lon, sph.lat)
-
-#========= allocate and sample vector fields ========#
-
-const SHTVectorSpat{N} = NamedTuple{(:ucolat, :ulon),         <:Tuple{<:AF64{N}, <:AF64{N}}}
-const SHTVectorSpec{M} = NamedTuple{(:spheroidal, :toroidal), <:Tuple{<:AC64{M}, <:AC64{M}}}
-
-similar_spec(spat::SHTVectorSpat, sph) = allocate_shtns(Val(:vector_spec), sph)
-similar_spat(spec::SHTVectorSpec, sph) = allocate_shtns(Val(:vector_spat), sph)
-
-allocate_shtns(::Val{:vector_spat}, sph::SHTnsSphere, args...) = (
-    ucolat = shtns_alloc_spat(sph, args...),
-    ulon = shtns_alloc_spat(sph, args...) )
-
-allocate_shtns(::Val{:vector_spec}, sph::SHTnsSphere, args...) = (
-    spheroidal = shtns_alloc_spec(sph, args...),
-    toroidal = shtns_alloc_spec(sph, args...) )
 
 function sample_vector!(::Void, ulonlat, sph::SHTnsSphere)
     (; x, y, z, lon, lat) = sph
@@ -103,15 +110,13 @@ function sample_vector!(::Void, ulonlat, sph::SHTnsSphere)
     return (; ucolat, ulon)
 end
 
-#========= scalar synthesis ========#
+#========= scalar synthesis / analysis ========#
 
 function synthesis_scalar!(spat::MF64, spec::VC64, sph::SHTnsSphere)
     priv.SH_to_spat(sph.ptr, spec, spat)
     return spat
 end
 synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
-
-#========= scalar analysis ========#
 
 function analysis_scalar!(spec::VC64, spat::MF64, sph::SHTnsSphere)
     priv.spat_to_SH(sph.ptr, spat, spec)
@@ -120,33 +125,30 @@ end
 
 analysis_scalar!(::Void, spat::AF64, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
 
-#========= vector analysis ========#
+#========= vector synthesis / analysis ========#
 
-function analysis_vector!(spec::SHTVectorSpec, spat::SHTVectorSpat, sph::SHTnsSphere)
+analysis_vector!(::Void, spat, sph) = analysis_vector!(similar_spec(spat, sph), spat, sph)
+analysis_vector!(spec::SHTVectorSpec, spat::InOut, sph) = analysis_vector!(spec, readable(spat), sph)
+function analysis_vector!(spec::SHTVectorSpec{Float64,1}, spat::SHTVectorSpat{Float64,2}, sph::SHTnsSphere)
     priv.spat_to_SHsphtor(sph.ptr, spat.ucolat, spat.ulon, spec.spheroidal, spec.toroidal)
     return spec
 end
 
-analysis_vector!(::Void, spat::SHTVectorSpat, sph::SHTnsSphere) = analysis_vector!(similar_spec(spat, sph), spat, sph)
-
-#========= vector synthesis ========#
-
+synthesis_vector!(::Void, spec, sph) = synthesis_vector!(similar_spat(spec, sph), spec, sph)
+synthesis_vector!(spat::SHTVectorSpat, spec::InOut, sph) = synthesis_vector!(spat, writable(spec), sph)
 function synthesis_vector!(spat::SHTVectorSpat, spec::SHTVectorSpec, sph::SHTnsSphere)
     priv.SHsphtor_to_spat(sph.ptr, spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
     return spat
 end
 
-synthesis_vector!(::Void, spec::SHTVectorSpec, sph::SHTnsSphere) = synthesis_vector!(similar_spat(spec, sph), spec, sph)
-
-#========= spheroidal synthesis (gradient) =========#
-
+# spheroidal synthesis (gradient)
 function synthesis_spheroidal!(spat::SHTVectorSpat, spec::VC64, sph::SHTnsSphere)
     priv.SHsph_to_spat(sph.ptr, spec, spat.ucolat, spat.ulon)
     return spat
 end
 
 synthesis_spheroidal!(::Void, spec::VC64, sph::SHTnsSphere) =
-    synthesis_spheroidal!(allocate_shtns(Val(:vector_spat), sph), spec, sph)
+    synthesis_spheroidal!(shtns_alloc(Float64, Val(:vector_spat), sph), spec, sph)
 
 #========= curl, div ========#
 

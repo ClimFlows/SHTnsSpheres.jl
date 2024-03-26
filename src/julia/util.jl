@@ -30,13 +30,6 @@ copying and allocating.
 erase(x) = InOut(x)
 erase(x::InOut) = x
 
-"""
-    y = protect(x)
-Makes sure x is not modified even if x::InOut. Used internally for reverse AD.
-"""
-protect(x::InOut) = x.data
-protect(x) = x
-
 """ Unwrap input argument. Used internally when we can promise that x will not be modified."""
 readable(x) = x
 readable(x::InOut) = x.data
