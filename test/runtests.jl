@@ -1,8 +1,8 @@
 using Test, Zygote, ForwardDiff
 using SHTnsSpheres: SHTnsSphere, void,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
-    sample_vector!, analysis_vector!, synthesis_vector!,
-    synthesis_spheroidal, analysis_div
+    sample_vector!, analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
+    curl!, divergence!
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
@@ -69,32 +69,39 @@ end
 #========= Check consistency of adjoint and tangent =======#
 
 function test_AD(sph, F=Float64)
-    synthesis(f) = synthesis_scalar!(void, f, sph)
-    analysis(f) = analysis_scalar!(void, copy(f), sph) # modifies input !
-
     (; x,y,z) = sph
     spat = @. (y+2z)^2
     dspat = @. x^2
-    spec = analysis(spat)
-    dspec = analysis(dspat)
+    spec = analysis_scalar!(void, spat, sph)
+    dspec = analysis_scalar!(void, dspat, sph)
 
     check_gradient(spec, dspec) do fspec
-        fspat = synthesis(fspec)
-        return analysis(fspat.^2)
+        fspat = synthesis_scalar!(void, fspec, sph)
+        return analysis_scalar!(void, fspat.^2, sph)
     end
 
     check_gradient(spec, dspec) do fspec
-        uv = synthesis_spheroidal(fspec, sph)
+        u, v = synthesis_spheroidal!(void, fspec, sph)
+        k = @. u^2+v^2
+        analysis_scalar!(void, k, sph)
+    end
+
+    check_gradient(spec, dspec) do fspec
+        uv = synthesis_spheroidal!(void, fspec, sph)
         u, v = uv
         k = @. u^2+v^2
         uv = map(x->k.*x, uv)
-        analysis_div(uv, sph)
+        uv_spec = analysis_vector!(void, uv, sph)
+        divergence!(void, uv_spec, sph)
     end
 
     check_gradient(spec, dspec) do fspec
-        u, v = synthesis_spheroidal(fspec, sph)
+        uv = synthesis_spheroidal!(void, fspec, sph)
+        u, v = uv
         k = @. u^2+v^2
-        analysis(k)
+        uv = map(x->k.*x, uv)
+        uv_spec = analysis_vector!(void, uv, sph)
+        curl!(void, uv_spec, sph)
     end
 
 end
