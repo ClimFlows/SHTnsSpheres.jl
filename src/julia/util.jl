@@ -21,16 +21,27 @@ end
 const In{T} = Union{T, InOut{T}}
 
 """
-    y = inout(x)
+    y = erase(x)
 Some functions need to make copies of input arguments to avoid modifying their contents
-and remain pure. Passing `inout(x)` as input argument is equivalent to passing `x`, except
+and remain pure. Passing `erase(x)` as input argument is equivalent to passing `x`, except
 that it explicitly allows to modify the contents of `x`, thus avoiding
 copying and allocating.
 """
-inout(x) = InOut(x)
+erase(x) = InOut(x)
+erase(x::InOut) = x
 
+"""
+    y = protect(x)
+Makes sure x is not modified even if x::InOut. Used internally for reverse AD.
+"""
+protect(x::InOut) = x.data
+protect(x) = x
+
+""" Unwrap input argument. Used internally when we can promise that x will not be modified."""
 readable(x) = x
 readable(x::InOut) = x.data
+
+""" Unwrap input argument. Used internally when we cannot promise that x will not be modified."""
 writable(x) = copy_input(x)
 writable(x::InOut) = x.data
 copy_input(x) = copy(x)

@@ -145,27 +145,16 @@ function synthesis_spheroidal!(spat::SHTVectorSpat, spec::VC64, sph::SHTnsSphere
     return spat
 end
 
-synthesis_spheroidal(spec::VC64, sph::SHTnsSphere) =
+synthesis_spheroidal!(::Void, spec::VC64, sph::SHTnsSphere) =
     synthesis_spheroidal!(allocate_shtns(Val(:vector_spat), sph), spec, sph)
 
-#========= divergence ========#
+#========= curl, div ========#
 
-function divergence!(spec::VC64, spat::SHTVectorSpec, sph::SHTnsSphere)
-    spheroidal, laplace = spat.spheroidal, sph.laplace
-    @. spec = spheroidal*laplace
-    return spec
-end
+curl!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
+    @. spec_out = spec_in.toroidal * sph.laplace
 
-divergence(spec::SHTVectorSpec, sph::SHTnsSphere) = spec.spheroidal .* sph.laplace
-
-function analysis_div(spat::SHTVectorSpat, sph::SHTnsSphere)
-    (; spheroidal) = analysis_vector!(void, spat, sph)
-    return spheroidal .* sph.laplace
-end
-
-#========= curl ========#
-
-curl(spec::SHTVectorSpec, sph::SHTnsSphere) = spec.toroidal .* sph.laplace
+divergence!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
+    @. spec_out = spec_in.spheroidal * sph.laplace
 
 #========== for Julia <1.9 ==========#
 

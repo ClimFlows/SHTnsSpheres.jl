@@ -4,9 +4,7 @@ import SHTnsSpheres:
     Void, void, In,
     similar_spec, similar_spat, allocate_shtns,
     analysis_scalar!, synthesis_scalar!,
-    analysis_vector!, synthesis_vector!,
-    analysis_div,
-    synthesis_spheroidal, synthesis_spheroidal!
+    analysis_vector!, synthesis_vector!, synthesis_spheroidal!
 
 using ForwardDiff: Dual, Partials
 
@@ -59,18 +57,18 @@ dual(T) = (v,p)->dual(T,v,p)
 dual(T::Type, v::A, p::A) where {A<:Array} = map(Dualizer{T}(), v, p)
 dual(T::Type, v::NT, p::NT) where {NT<:NamedTuple} = map(dual(T), v, p)
 
-function apply(fun, arg, sph)
-    v = fun(value(arg), sph)
-    p = fun(partial(arg), sph)
+function apply(fun!, arg, sph)
+    v = fun!(void, value(arg), sph)
+    p = fun!(void, partial(arg), sph)
     return dual(tag(arg), v, p)
 end
 
-analysis_scalar(spat::ScalarSpat, sph) = apply(analysis_scalar, spat, sph)
-analysis_vector(spat::VectorSpat, sph) = apply(analysis_vector, spat, sph)
-analysis_div(spat::VectorSpat, sph) = apply(analysis_div, spat, sph)
-synthesis_scalar(spec::ScalarSpec, sph) = apply(synthesis_scalar, spec, sph)
-synthesis_vector(spec::VectorSpec, sph) = apply(synthesis_vector, spec, sph)
-synthesis_spheroidal(spec::ScalarSpec, sph) = apply(synthesis_spheroidal, spec, sph)
+analysis_scalar!(::Void, spat::ScalarSpat, sph) = apply(analysis_scalar!, spat, sph)
+analysis_vector!(::Void, spat::VectorSpat, sph) = apply(analysis_vector!, spat, sph)
+analysis_div!(::Void, spat::VectorSpat, sph) = apply(analysis_div, spat!, sph)
+synthesis_scalar!(::Void, spec::ScalarSpec, sph) = apply(synthesis_scalar!, spec, sph)
+synthesis_vector!(::Void, spec::VectorSpec, sph) = apply(synthesis_vector!, spec, sph)
+synthesis_spheroidal!(::Void, spec::ScalarSpec, sph) = apply(synthesis_spheroidal!, spec, sph)
 
 #==================== mutating ================#
 
@@ -89,8 +87,8 @@ end
 
 analysis_scalar!(spec::ScalarSpec, spat::ScalarSpat, sph) =
     apply!(Val(:scalar_spec), analysis_scalar!, spec, spat, sph)
-analysis_scalar!(::Void, spat::ScalarSpat, sph) =
-    apply!(Val(:scalar_spec), analysis_scalar!, similar_spec(spat, sph), spat, sph)
+# analysis_scalar!(::Void, spat::ScalarSpat, sph) =
+#    apply!(Val(:scalar_spec), analysis_scalar!, similar_spec(spat, sph), spat, sph)
 
 analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =
     apply!(Val(:vector_spec), analysis_vector!, spec, spat, sph)
@@ -98,10 +96,13 @@ analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =
 synthesis_scalar!(spat::ScalarSpat, spec::ScalarSpec, sph) =
     apply!(Val(:scalar_spat), synthesis_scalar!, spat, spec, sph)
 
-synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph) =
-    apply!(Val(:vector_spat), synthesis_vector!, spat, spec, sph)
+# synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph) =
+#    apply!(Val(:vector_spat), synthesis_vector!, spat, spec, sph)
 
 synthesis_spheroidal!(spat::VectorSpat, spec::ScalarSpec, sph) =
     apply!(Val(:vector_spat), synthesis_spheroidal!, spat, spec, sph)
+
+# synthesis_spheroidal!(::Void, spec::ScalarSpec, sph) =
+#    apply!(Val(:vector_spat), synthesis_spheroidal!, similar_spat(spec, sph), spec, sph)
 
 end

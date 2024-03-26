@@ -4,10 +4,9 @@ using Zygote: @adjoint
 import SHTnsSpheres: void, Void,
     analysis_scalar!,
     analysis_vector!, # TODO
-    analysis_div,
     synthesis_scalar!,
     synthesis_vector!, # TODO
-    synthesis_spheroidal
+    synthesis_spheroidal!
 
 function scale_m0!(spec, sph, fac)
     for i in 1:sph.mmax+1
@@ -23,21 +22,28 @@ So we make copies of input arguments.
 """
 protect(x::AbstractArray) = copy(x)
 protect(x::NamedTuple) = map(protect, x)
+protect(::Nothing) = nothing
 
 #=================== scalar ==============#
 
-@adjoint analysis_scalar!(::Void, spat, sph) =
-    analysis_scalar!(void, protect(spat), sph),
-    (spec -> adjoint_analysis_scalar(protect(spec), sph))
+isvoid(::Void, fun) = void
+isvoid(storage, fun) = throw(ArgumentError("""
+    For reverse AD of SHTnsSpheres with Zygote, only non-mutating functions are supported.
+    `SHTnsSpheres.$(fun)` has been called with non-void first argument of type `$(typeof(storage))`. Please make sure the first argument is `void` or <:Void`.
+    """))
 
-@adjoint synthesis_scalar!(::Void, spec, sph) =
-    synthesis_scalar!(void, protect(spec), sph),
-    (spat -> adjoint_synthesis_scalar(protect(spat), sph))
+@adjoint analysis_scalar!(out, spat, sph) =
+    analysis_scalar!(isvoid(out, analysis_scalar!), protect(spat), sph),
+    (spec -> adjoint_analysis_scalar(protect(spec), sph))
 
 function adjoint_analysis_scalar(spec, sph)
     scale_m0!(spec, sph, 2.0)
     return nothing, synthesis_scalar!(void, spec, sph), nothing, nothing
 end
+
+@adjoint synthesis_scalar!(out, spec, sph) =
+    synthesis_scalar!(isvoid(out, synthesis_scalar!), protect(spec), sph),
+    (spat -> adjoint_synthesis_scalar(protect(spat), sph))
 
 function adjoint_synthesis_scalar(spat, sph)
     spec = analysis_scalar!(void, spat, sph)
@@ -47,22 +53,50 @@ end
 
 #================= vector =================#
 
-@adjoint analysis_div(uv, sph) = analysis_div(protect(uv), sph),
-(div_spec) -> adjoint_analysis_div(protect(div_spec), sph)
+@adjoint synthesis_vector!(out, spec, sph) =
+    synthesis_vector!(isvoid(out, synthesis_vector!), protect(spec), sph),
+    (uv_spat) -> adjoint_synthesis_vector(protect(uv_spat), sph)
 
-@adjoint synthesis_spheroidal(phi_spec, sph) = synthesis_spheroidal(protect(phi_spec), sph),
-(uv_spat) -> adjoint_synthesis_spheroidal(protect(uv_spat), sph)
-
-function adjoint_analysis_div(spec, sph)
-    scale_m0!(spec, sph, 2.0)
-    ucolat, ulon = synthesis_spheroidal(spec, sph)
-    return (ucolat = -ucolat, ulon = -ulon), nothing, nothing
+function adjoint_synthesis_vector(uv_spat, sph)
+    spec = analysis_vector!(void, uv_spat, sph)
+    scale_m0!(spec, sph, 0.5)
+    @. spec *= -sph.laplace
+    return nothing, spec, nothing, nothing
 end
 
+@adjoint analysis_vector!(out, spat, sph) =
+    analysis_vector!(isvoid(out, analysis_vector!), protect(spat), sph),
+    (uv_spec) -> adjoint_analysis_vector(protect(uv_spec), sph)
+
+function adjoint_analysis_vector((; toroidal, spheroidal), sph)
+    if !isnothing(spheroidal)
+        scale_m0!(spheroidal, sph, 2)
+        @. spheroidal *= -sph.poisson
+    end
+    if !isnothing(toroidal)
+        scale_m0!(toroidal, sph, 2)
+        @. toroidal *= -sph.poisson
+    end
+    if isnothing(toroidal)
+        spat = synthesis_spheroidal!(void, spheroidal, sph)
+    elseif isnothing(spheroidal)
+        spat = synthesis_spheroidal!(void, toroidal, sph)
+        spat = (ucolat=spat.ulon, ulon=-spat.ucolat)
+    else
+        spat = synthesis_vector!(void, spec, sph)
+    end
+    return nothing, spat, nothing, nothing
+end
+
+@adjoint synthesis_spheroidal!(out, phi_spec, sph) =
+    synthesis_spheroidal!(isvoid(out, synthesis_spheroidal!), protect(phi_spec), sph),
+    (uv_spat) -> adjoint_synthesis_spheroidal(protect(uv_spat), sph)
+
 function adjoint_synthesis_spheroidal(uv_spat, sph)
-    spec = analysis_div(uv_spat, sph)
-    spec = scale_m0!(spec, sph, 0.5)
-    return -spec, nothing, nothing
+    spec = analysis_vector!(void, uv_spat, sph).spheroidal
+    scale_m0!(spec, sph, 0.5)
+    @. spec *= -sph.laplace
+    return nothing, spec, nothing, nothing
 end
 
 end
