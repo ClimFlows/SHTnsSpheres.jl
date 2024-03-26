@@ -25,7 +25,7 @@ sphere = SHTnsSpheres.SHTnsSphere(21)
 ```
 You may also explicitly list the objects you use:
 ```julia
-using SHTnsSpheres: SHTnsSphere, analysis_scalar, synthesis_scalar
+using SHTnsSpheres: SHTnsSphere, sample_scalar!, analysis_scalar!, synthesis_scalar!
 sphere = SHTnsSphere(21)
 ```
 See also the [unit tests](test/runtests.jl).
@@ -36,13 +36,41 @@ The spectral representation of a scalar field is a `Vector` of complex spectral 
 
 The spectral representation of a vector field is a named tuple `(; toroidal, spheroidal)` of complex `Vector`s corresponding to a vector potential and streamfunction. The grid representation of a vector field is a named tuple `(; ucolat, ulon)` of real matrices storing grid-point values of vector components in colatitude, longitude coordinates.
 
-`synthesis_XX` takes spectral coefficients and returns grid-point values. `analysis_XX` goes in the reverse direction.
+`synthesis_XX!` takes spectral coefficients and returns grid-point values. `analysis_XX!` goes in the reverse direction.
 
-## Warning
+## Mutating and non-mutating variants
 
-Following julia convention, `analysis_XX` returns a newly allocated object while `analysis!_XX` is an non-allocating transform whose first argument is caller-allocated storage for the output.
+Following julia convention, the first argument of functions whose name ends with `!` is an output argument, as in `copy!` or `mul!`. If an existing field is passed as this argument, the function call should not allocate. This is the default, mutating variant. However automatic differentiation in reverse mode prefers pure, non-mutating functions. The non-mutating variant is obtained by passing `void` as the first argument.
 
-**`SHTns` may modify input argument(s)** and fill them with garbage. *If you want to protect your `data`, you should pass `copy(data)` as input.*
+```julia
+using SHTnsSpheres: void
+f(x,y,z,lon,lat) = x*z
+g(x,y,z,lon,lat) = x*y
+xy_spat = sample_scalar!(void, f, sphere)         # non-mutating, allocates xy_spat
+xy_spec = analysis_scalar!(void, xy_spat, sphere) # non-mutating, allocates xy_spec
+xy_spat = sample_scalar!(xy_spat, g, sphere)      # mutating, does not allocate
+```
+
+**`SHTns` may modify input argument(s)** and fill them with garbage. To protect your data, a copy is made
+where necessary, but this allocates. If it is acceptable for you to lose your input data, you can avoid this allocation by passing `erase(data)` as argument. `erase(data)` returns a thin wrapper around `data` that tells `SHTnsSpheres` that a copy is not required.
+
+```julia
+using SHTnsSphere: erase
+# non-mutating, allocates xy_spec, internally allocates a copy of xy_spat
+xy_spec = analysis_scalar!(void, xy_spat, sphere)
+# mutating, non-allocating but fills xy_spat with garbage
+xy_spec = analysis_scalar!(xy_spec, erase(xy_spat), sphere)
+```
+
+## Automatic differentiation (AD)
+
+`SHTnsSpheres` works with ForwardDiff (forward AD) and `Zygote` (reverse AD).
+
+For reverse AD, `SHTnsSpheres` guarantees that non-mutating variants do not modify their input arguments, even if passed as `erase(data)`. Thus a copy may be made internally. This hopefully prevents silent AD errors, at the price of extra allocations.
+
+## Thread safety
+
+At this moment `SHTnsSpheres` makes no promises regarding thread safety. Use a lock if you use the same `SHTnsSphere` object from different threads.
 
 ## Credits
 
