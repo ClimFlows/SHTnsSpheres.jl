@@ -9,6 +9,7 @@ export AF64, AC64, MF64, VC64
 end
 
 using .priv
+using .priv: shtns_use_threads
 
 include("julia/util.jl")
 
