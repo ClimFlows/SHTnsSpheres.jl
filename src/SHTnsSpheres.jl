@@ -152,8 +152,10 @@ synthesis_spheroidal!(::Void, spec::VC64, sph::SHTnsSphere) =
 
 #========= curl, div ========#
 
+# due to SHTns sign convention, ζ=-ΔT with T the toroidal component
+# see https://www2.atmos.umd.edu/~dkleist/docs/shtns/doc/html/vsh.html
 curl!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
-    @. spec_out = spec_in.toroidal * sph.laplace
+    @. spec_out = spec_in.toroidal * (-sph.laplace)
 
 divergence!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
     @. spec_out = spec_in.spheroidal * sph.laplace
