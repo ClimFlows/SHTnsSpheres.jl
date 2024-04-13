@@ -18,6 +18,7 @@ Zygote_Ext = ["Zygote"]
 
 [compat]
 ForwardDiff = "0.10"
+PackageExtensionCompat = "1"
 SHTns_jll = "3.5"
 Zygote = "0.6"
 julia = "1.8"
