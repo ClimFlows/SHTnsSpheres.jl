@@ -9,7 +9,16 @@ export AF64, AC64, MF64, VC64
 end
 
 using .priv
-using .priv: shtns_use_threads
+
+"""
+    num_threads = shtns_use_threads(num_threads)
+
+Call *before* any initialization of shtns to use mutliple threads. Returns the actual number of threads.
+    If num_threads > 0, specifies the maximum number of threads that should be used.
+    If num_threads <= 0, maximum number of threads is automatically set to the number of processors.
+    If num_threads == 1, openmp will be disabled.
+"""
+shtns_use_threads(n::Int=0) = ccall((:shtns_use_threads, :libshtns), Cint, (Cint,), n)
 
 include("julia/util.jl")
 
