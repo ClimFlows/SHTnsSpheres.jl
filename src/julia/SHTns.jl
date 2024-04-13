@@ -38,16 +38,6 @@ const PF64 = Ptr{Float64}
 const PC64 = Ptr{ComplexF64}
 const SHTConfig = Ptr{shtns_info}
 
-"""
-    num_threads = shtns_use_threads(num_threads)
-
-Call *before* any initialization of shtns to use mutliple threads. Returns the actual number of threads.
-    If num_threads > 0, specifies the maximum number of threads that should be used.
-    If num_threads <= 0, maximum number of threads is automatically set to the number of processors.
-    If num_threads == 1, openmp will be disabled.
-"""
-shtns_use_threads(n::Int=0) = ccall((:shtns_use_threads, :libshtns), Cint, (Cint,), n)
-
 function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::Int, nphi::Int)
     output_ptr = ccall(
         (:shtns_init, :libshtns),              # name of C function and library
