@@ -88,10 +88,15 @@ Base.show(io::IO, ::Type{SHTVectorSpec{F,N}}) where {F,N} =
 
 similar_spec(x::InOut, sph) = similar_spec(readable(x), sph)
 similar_spec(::Matrix{F}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph)
-similar_spec(::SHTVectorSpat{F}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph)
+similar_spec(a::Array{F, 3}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph, size(a,3))
+similar_spec(a::Array{F, 4}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph, size(a,3), size(a,4))
+similar_spec(::SHTVectorSpat{F,2}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph)
+similar_spec(a::SHTVectorSpat{F,3}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph, size(a.ucolat, 3))
 
 similar_spat(x::InOut, sph) = similar_spat(readable(x), sph)
 similar_spat(::Vector{Complex{F}}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph)
+similar_spat(a::Matrix{Complex{F}}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph, size(a,2))
+similar_spat(a::Array{Complex{F},3}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph, size(a,2), size(a,3))
 similar_spat(::SHTVectorSpec{F}, sph) where F = shtns_alloc(F, Val(:vector_spat), sph)
 
 shtns_alloc(F, ::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(F, sph, args...)
@@ -122,14 +127,27 @@ end
 
 #========= scalar synthesis / analysis ========#
 
-function synthesis_scalar!(spat::MF64, spec::VC64, sph::SHTnsSphere)
-    priv.SH_to_spat(sph.ptr, spec, spat)
+function synthesis_scalar!(spat::Array{Float64}, spec::Array{ComplexF64}, sph::SHTnsSphere)
+    @assert ndims(spat) <= 4
+    @assert ndims(spat) == ndims(spec)+1
+    @assert axes(spec,2) == axes(spat, 3)
+    @assert axes(spec,3) == axes(spat, 4)
+    for k in axes(spec,2), l in axes(spec,3)
+        @views priv.SH_to_spat(sph.ptr, spec[:,k,l], spat[:,:,k,l])
+    end
     return spat
 end
+
 synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
 
-function analysis_scalar!(spec::VC64, spat::MF64, sph::SHTnsSphere)
-    priv.spat_to_SH(sph.ptr, spat, spec)
+function analysis_scalar!(spec::Array{ComplexF64}, spat::Array{Float64}, sph::SHTnsSphere)
+    @assert ndims(spat) <= 4
+    @assert ndims(spat) == ndims(spec)+1
+    @assert axes(spec,2) == axes(spat, 3)
+    @assert axes(spec,3) == axes(spat, 4)
+    for k in axes(spec,2), l in axes(spec, 3)
+        @views priv.spat_to_SH(sph.ptr, spat[:,:,k,l], spec[:,k,l])
+    end
     return spec
 end
 
@@ -141,6 +159,18 @@ analysis_vector!(::Void, spat, sph) = analysis_vector!(similar_spec(spat, sph), 
 analysis_vector!(spec::SHTVectorSpec, spat::InOut, sph) = analysis_vector!(spec, readable(spat), sph)
 function analysis_vector!(spec::SHTVectorSpec{Float64,1}, spat::SHTVectorSpat{Float64,2}, sph::SHTnsSphere)
     priv.spat_to_SHsphtor(sph.ptr, spat.ucolat, spat.ulon, spec.spheroidal, spec.toroidal)
+    return spec
+end
+
+function analysis_vector!(spec::SHTVectorSpec{Float64,2}, spat::SHTVectorSpat{Float64,3}, sph::SHTnsSphere)
+    @assert axes(spec.toroidal,2) == axes(spec.spheroidal,2)
+    @assert axes(spat.ucolat,3) == axes(spat.ulon,3)
+    @assert axes(spec.toroidal,2) == axes(spat.ulon,3)
+    for k in axes(spec.toroidal, 2)
+#        @views analysis_vector!((spheroidal=spec.spheroidal[:,k], toroidal=spec.toroidal[:,k]),
+#            (ucolat=spat.ucolat[:,:,k], ulon=spat.ulon[:,:,k]), sph)
+        @views priv.spat_to_SHsphtor(sph.ptr, spat.ucolat[:,:,k], spat.ulon[:,:,k], spec.spheroidal[:,k], spec.toroidal[:,k])
+    end
     return spec
 end
 
