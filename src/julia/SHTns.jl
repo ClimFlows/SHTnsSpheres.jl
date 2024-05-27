@@ -72,7 +72,7 @@ function SH_to_spat(ptr::SHTConfig, qlm::VC64, vr::MF64)
         ptr, qlm, vr)              # arguments
 end
 
-function spat_to_SH(ptr::SHTConfig, vr::MF64, qlm::VC64)
+function spat_to_SH(ptr::SHTConfig, qlm::VC64, vr::MF64)
     # check that arrays are contiguous
     @assert stride(vr,1)==1
     @assert stride(vr,2)==size(vr,1)
@@ -113,7 +113,7 @@ function SHsphtor_to_spat(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF
         ptr, slm, tlm, vt, vp)                # arguments
 end
 
-function spat_to_SHsphtor(ptr::SHTConfig, vt::MF64, vp::MF64, slm::VC64, tlm::VC64)
+function spat_to_SHsphtor(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF64)
     ccall(
         (:spat_to_SHsphtor, :libshtns),       # name of C function and library
         Cvoid,                                # output type
