@@ -196,13 +196,19 @@ synthesis_vector!(spat::SHTVectorSpat, spec::SHTVectorSpec, sph::SHTnsSphere) =
     synthesis!(priv.SHsphtor_to_spat, sph, spec, spat)
 
 # spheroidal synthesis (gradient)
-function synthesis_spheroidal!(spat::SHTVectorSpat, spec::VC64, sph::SHTnsSphere)
-    priv.SHsph_to_spat(sph.ptr, spec, spat.ucolat, spat.ulon)
-    return spat
+function transform!(fun, sph, spec::Array{ComplexF64}, spat::SHTVectorSpat)
+    for k in axes(spec, 2), l in axes(spec, 3)
+        @views fun(sph.ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
+    end
 end
 
 synthesis_spheroidal!(::Void, spec::VC64, sph::SHTnsSphere) =
     synthesis_spheroidal!(shtns_alloc(Float64, Val(:vector_spat), sph), spec, sph)
+synthesis_spheroidal!(::Void, spec::Matrix{ComplexF64}, sph::SHTnsSphere) =
+    synthesis_spheroidal!(shtns_alloc(Float64, Val(:vector_spat), sph, size(spec,2)), spec, sph)
+
+synthesis_spheroidal!(spat::SHTVectorSpat, spec::Array{ComplexF64}, sph::SHTnsSphere) =
+    synthesis!(priv.SHsph_to_spat, sph, spec, spat)
 
 #========= curl, div ========#
 
