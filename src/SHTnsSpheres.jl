@@ -1,6 +1,7 @@
 module SHTnsSpheres
 
 using MutatingOrNot: void, Void
+using Polyester: @batch
 
 module priv
 using SHTns_jll
@@ -25,6 +26,7 @@ include("julia/util.jl")
 #==================================================================#
 
 struct SHTnsSphere
+    ptrs     :: Vector{priv.SHTConfig} # multi-thread
     ptr      :: priv.SHTConfig
     info     :: priv.shtns_info
     nml      :: Int     # total number of (l,m) spherical harmonics components.
@@ -46,9 +48,10 @@ struct SHTnsSphere
     laplace  :: Vector{Float64} # eigenvalues of Laplace operator
     poisson  :: Vector{Float64} # eigenvalues of Poisson operator
 
-    function SHTnsSphere(nlat)
+    function SHTnsSphere(nlat, nthreads=Threads.nthreads())
         lmax = div(2nlat, 3)
-        ptr = priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat)
+        ptrs = [priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat) for _ in 1:nthreads]
+        ptr = ptrs[1]
         info = unsafe_load(ptr,1)
         costheta = [unsafe_load(info.ct, i) for i in 1:nlat]
         sintheta = [unsafe_load(info.st, i) for i in 1:nlat]
@@ -64,7 +67,7 @@ struct SHTnsSphere
 
         poisson = map( x-> (x==0) ? 0 : inv(x), lap)
 
-        return new(ptr, info,
+        return new(ptrs, ptr, info,
             info.nml, info.nml_cplx,
             info.lmax, info.mmax,
             info.nlat, info.nlat_padded,
@@ -141,6 +144,17 @@ function synthesis!(fun::Fun, sph, spec, spat) where Fun
     return spat
 end
 
+function batch(fun, sph, nk, nl)
+    nthreads = length(sph.ptrs)
+    @batch per=core for thread in 1:nthreads
+        ptr = sph.ptrs[thread]
+        start, stop = div(nk*(thread-1), nthreads), div(nk*thread, nthreads)
+        for k in start+1:stop, l=1:nl
+            fun(ptr, k, l)
+        end
+    end
+end
+
 extra_axes(spec::SHTVectorSpec) = extra_axes(spec.toroidal, spec.spheroidal)
 extra_axes(spat::SHTVectorSpat) = extra_axes(spat.ucolat, spat.ulon)
 
@@ -162,8 +176,8 @@ end
 #========= scalar synthesis / analysis ========#
 
 function transform!(fun, sph, spec::Array{ComplexF64}, spat::Array{Float64})
-    for k in axes(spec,2), l in axes(spec,3)
-        @views fun(sph.ptr, spec[:,k,l], spat[:,:,k,l])
+    batch(sph, size(spec,2), size(spec,3)) do ptr, k, l
+        @views fun(ptr, spec[:,k,l], spat[:,:,k,l])
     end
 end
 
@@ -180,8 +194,8 @@ analysis_scalar!(::Void, spat::AF64, sph::SHTnsSphere) = analysis_scalar!(simila
 #========= vector synthesis / analysis ========#
 
 function transform!(fun, sph, spec::SHTVectorSpec, spat::SHTVectorSpat)
-    for k in axes(spec.toroidal, 2), l in axes(spec.toroidal, 3)
-        @views fun(sph.ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
+    batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, k, l
+        @views fun(ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
     end
 end
 
@@ -197,8 +211,8 @@ synthesis_vector!(spat::SHTVectorSpat, spec::SHTVectorSpec, sph::SHTnsSphere) =
 
 # spheroidal synthesis (gradient)
 function transform!(fun, sph, spec::Array{ComplexF64}, spat::SHTVectorSpat)
-    for k in axes(spec, 2), l in axes(spec, 3)
-        @views fun(sph.ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
+    batch(sph, size(spec,2), size(spec,3)) do ptr, k, l
+        @views fun(ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
     end
 end
 

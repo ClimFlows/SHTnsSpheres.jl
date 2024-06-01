@@ -1,11 +1,12 @@
 name = "SHTnsSpheres"
 uuid = "9e5c175a-5132-4517-85a1-2957ec255f89"
 authors = ["The ClimFlows contributors"]
-version = "0.2.3"
+version = "0.2.4"
 
 [deps]
 MutatingOrNot = "6a37069a-9a67-4b2d-a34a-f09ab4b23c7c"
 PackageExtensionCompat = "65ce6f38-6b18-4e1d-a461-8949797d7930"
+Polyester = "f517fe37-dbe3-4b94-8317-1923a5111588"
 SHTns_jll = "daf09cc5-9ab3-509e-9618-0b89086eb825"
 
 [weakdeps]
