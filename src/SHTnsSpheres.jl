@@ -48,7 +48,7 @@ struct SHTnsSphere
     laplace  :: Vector{Float64} # eigenvalues of Laplace operator
     poisson  :: Vector{Float64} # eigenvalues of Poisson operator
 
-    function SHTnsSphere(nlat, nthreads=Threads.nthreads())
+    function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads())
         lmax = div(2nlat, 3)
         ptrs = [priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat) for _ in 1:nthreads]
         ptr = ptrs[1]
@@ -74,6 +74,21 @@ struct SHTnsSphere
             info.nphi, info.nspat,
             li, mi, x, y, sinlat, lon, lat, lap, poisson)
     end
+
+    function SHTnsSphere(sph::SHTnsSphere, nthreads::Int)
+        @assert nthreads <= length(sph.ptrs)
+        ptrs = sph.ptrs[1:nthreads]
+        info = sph.info
+        return new(ptrs, sph.ptr, info,
+                   info.nml, info.nml_cplx,
+                   info.lmax, info.mmax,
+                   info.nlat, info.nlat_padded,
+                   info.nphi, info.nspat,
+                   sph.li, sph.mi,
+                   sph.x, sph.y, sph.z, sph.lon, sph.lat,
+                   sph.laplace, sph.poisson)
+    end
+    
 end
 
 Base.show(io::IO, sph::SHTnsSphere) =
@@ -147,6 +162,7 @@ end
 function batch(fun, sph, nk, nl)
     nthreads = length(sph.ptrs)
     @batch per=core for thread in 1:nthreads
+#    Threads.@threads for thread in 1:nthreads
         ptr = sph.ptrs[thread]
         start, stop = div(nk*(thread-1), nthreads), div(nk*thread, nthreads)
         for k in start+1:stop, l=1:nl
