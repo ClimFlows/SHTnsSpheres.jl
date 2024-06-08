@@ -106,8 +106,10 @@ function test_AD(sph, F=Float64)
 
 end
 
-lmax = 32
-sph = SHTnsSphere(lmax)
+nlat = 128
+sph = SHTnsSphere(nlat)
 @show sph
 @testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
+
+include("scaling.jl")
