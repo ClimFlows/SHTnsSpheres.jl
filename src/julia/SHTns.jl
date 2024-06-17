@@ -38,6 +38,16 @@ const PF64 = Ptr{Float64}
 const PC64 = Ptr{ComplexF64}
 const SHTConfig = Ptr{shtns_info}
 
+function shtns_use_threads(num_threads::Int)
+    num = ccall(
+        (:shtns_use_threads, :libshtns),  # name of C function and library
+        Cint,          # output type
+        (Cint,),       # tuple of input types
+        num_threads)   # arguments
+    @info "shtns_use_threads($num_threads) = $num" 
+    return num
+end
+
 function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::Int, nphi::Int)
     output_ptr = ccall(
         (:shtns_init, :libshtns),              # name of C function and library
@@ -49,6 +59,16 @@ function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::In
         throw(OutOfMemoryError())
     end
     return output_ptr
+end
+
+function shtns_set_batch(config::SHTConfig, howmany::Integer, spec_dist::Integer)
+    output = ccall(
+        (:shtns_set_batch, :libshtns),   # name of C function and library
+        Cint,                            # output type
+        (SHTConfig, Cint, Clong),  # tuple of input types
+        config, howmany, spec_dist)      # arguments
+    @assert output == howmany
+    return nothing
 end
 
 function shtns_create(lmax::Int, mmax::Int, mres::Int=1, norm::Int=0)

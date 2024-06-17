@@ -1,4 +1,5 @@
-using SHTnsSpheres: shtns_alloc
+using SHTnsSpheres: SHTnsSpheres, shtns_alloc
+using SHTnsSpheres.priv: priv, SHTConfig
 using ThreadPinning
 pinthreads(:cores)
 threadinfo()
@@ -34,4 +35,20 @@ function scaling_synth(sph)
     end
 end
 
-scaling_synth(sph)
+function batch_sph(nlat, batch)
+    nlon=2nlat
+    lmax = div(nlon, 3)
+    ptr = priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat)
+    info = unsafe_load(ptr, 1)
+    (; nml) = info
+    priv.shtns_set_batch(ptr, batch, nml)
+    return (; ptr, info, nlon, nlat, lmax, nml, batch)
+end
+
+# scaling_synth(sph)
+
+nlat, nz = 128, 30
+@info "Creating spherical harmonics transform..."
+nthreads = SHTnsSpheres.priv.shtns_use_threads(Threads.nthreads())
+@time bsph = batch_sph(nlat, nz)
+display(bsph)
