@@ -55,7 +55,7 @@ struct SHTnsSphere
         info = unsafe_load(ptr,1)
         costheta = [unsafe_load(info.ct, i) for i in 1:nlat]
         sintheta = [unsafe_load(info.st, i) for i in 1:nlat]
-        lon    = [ pi*j/nlat   for i=0:(nlat-1), j=1:2nlat] # longitudes
+        lon    = [ pi*j/nlat   for i=1:nlat, j=0:(2nlat-1) ] # longitudes
         coslat = [ sintheta[i] for i=1:nlat, j=1:2nlat]
         sinlat = [ costheta[i] for i=1:nlat, j=1:2nlat] # sin(lat)
         x   = @. cos(lon)*coslat
