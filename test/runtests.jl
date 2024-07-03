@@ -106,10 +106,32 @@ function test_AD(sph, F=Float64)
 
 end
 
+
+
+#========= Check the phase of the spherical harmonics on one example =======#
+
+function Y11(x,y,z,lon,lat)
+    θ = π/2 - lat
+    ϕ = lon
+    return -sqrt(3/(2π)) * real(exp(1im * ϕ)) * sin(θ)
+end
+
+function test_azimuthal_phase(sph)
+    xy_spat = sample_scalar!(void, Y11, sph) 
+    xy_spec = analysis_scalar!(void, xy_spat, sph)
+    l, m = 1, 1
+    LM = (m * (2 * sph.lmax + 2 - (m + 1))) >> 1 + l + 1
+    result = xy_spec[LM]
+    @test real(result) ≈ 1.0
+    @test imag(result) ≈ 0.0 atol=eps()
+end
+
+
 nlat = 128
 sph = SHTnsSphere(nlat)
 @show sph
 @testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
+@testset "azimuthal phase aligned with coordinates" test_azimuthal_phase(sph)
 
 include("scaling.jl")
