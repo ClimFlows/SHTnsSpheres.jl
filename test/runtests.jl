@@ -4,6 +4,8 @@ using SHTnsSpheres: SHTnsSphere, void,
     sample_vector!, analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
     curl!, divergence!
 
+using LoopManagers: MultiThread, PlainCPU, VectorizedCPU
+
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
 Base.copy(t::NamedTuple) = map(copy, t)
@@ -66,6 +68,23 @@ function test_inv(sph, F=Float64)
     @test uv.ucolat ≈ uv2.ucolat
 end
 
+#========= Check LoopManagers =======#
+
+function test_managed(sph, nz=10)
+    spat = sample_scalar!(void, scalar, sph)
+    spat_ref = randn(Float64, size(spat,1), size(spat,2), nz)
+
+    spec_ref = analysis_scalar!(void, copy(spat_ref), sph)
+    @test true
+
+    mgr = MultiThread(VectorizedCPU(), length(sph.ptrs))
+    spec = analysis_scalar!(similar(spec_ref), copy(spat_ref), sph[mgr])
+    @test spec_ref ≈ spec
+
+    spat = synthesis_scalar!(similar(spat_ref), copy(spec_ref), sph[mgr])
+    @test spat_ref ≈ spat
+end
+
 #========= Check consistency of adjoint and tangent =======#
 
 function test_AD(sph, F=Float64)
@@ -106,8 +125,9 @@ function test_AD(sph, F=Float64)
 
 end
 
-lmax = 32
-sph = SHTnsSphere(lmax)
+lmax, nthreads = 32, 2
+sph = SHTnsSphere(lmax, nthreads)
 @show sph
 @testset "synthesis∘analysis == identity" test_inv(sph)
+@testset "ManagedLoops" test_managed(sph)
 @testset "Autodiff for SHTns" test_AD(sph)

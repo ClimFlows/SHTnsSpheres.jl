@@ -11,10 +11,12 @@ SHTns_jll = "daf09cc5-9ab3-509e-9618-0b89086eb825"
 
 [weakdeps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+ManagedLoops = "36a4119d-6b73-4371-88fe-ba2d91f5495d"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [extensions]
 ForwardDiff_Ext = ["ForwardDiff"]
+ManagedLoops_Ext = ["ManagedLoops"]
 Zygote_Ext = ["Zygote"]
 
 [compat]
@@ -27,6 +29,7 @@ julia = "1.8"
 
 [extras]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+ManagedLoops = "36a4119d-6b73-4371-88fe-ba2d91f5495d"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
