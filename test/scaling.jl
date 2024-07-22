@@ -21,7 +21,7 @@ function scaling(fun, name, sph, N)
         nt==1 && (single=elapsed)
         speedup = single/elapsed
         percent(x) = round(100x; digits=0)
-        @info "$nt \t\t $(round(elapsed; digits=4)) \t\t $(percent(speedup)) \t\t $(percent(speedup/nt))" 
+        @info "$nt \t\t $(round(elapsed; digits=4)) \t $(percent(speedup)) \t\t $(percent(speedup/nt))" 
     end
 end
 
