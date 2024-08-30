@@ -41,7 +41,7 @@ const SHTConfig = Ptr{shtns_info}
 function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::Int, nphi::Int)
     output_ptr = ccall(
         (:shtns_init, :libshtns),              # name of C function and library
-        Ptr{shtns_info},                       # output type
+        SHTConfig,                       # output type
         (Cint, Cint, Cint, Cint, Cint, Cint),  # tuple of input types
         flags, lmax, mmax, mres, nlat, nphi)   # arguments
 
@@ -49,6 +49,29 @@ function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::In
         throw(OutOfMemoryError())
     end
     return output_ptr
+end
+
+function shtns_create_with_grid(base::SHTConfig, mmax::Int, nofft::Bool)
+    output_ptr = ccall(
+        (:shtns_create_with_grid, :libshtns),  # name of C function and library
+        SHTConfig,                             # output type
+        (SHTConfig, Cint, Cint),               # tuple of input types
+        base, mmax, nofft)                     # arguments
+
+    if output_ptr == C_NULL # Could not allocate memory
+        throw(OutOfMemoryError())
+    end
+    return output_ptr
+end
+
+function shtns_set_batch(config::SHTConfig, howmany::Integer, spec_dist::Integer)
+    output = ccall(
+        (:shtns_set_batch, :libshtns),   # name of C function and library
+        Cint,                            # output type
+        (SHTConfig, Cint, Clong),  # tuple of input types
+        config, howmany, spec_dist)      # arguments
+    @assert output == howmany
+    return nothing
 end
 
 function shtns_create(lmax::Int, mmax::Int, mres::Int=1, norm::Int=0)

@@ -50,8 +50,7 @@ struct SHTnsSphere
 
     function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads())
         lmax = div(2nlat, 3)
-        ptrs = [priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat) for _ in 1:nthreads]
-        ptr = ptrs[1]
+        ptr = priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat)
         info = unsafe_load(ptr,1)
         costheta = [unsafe_load(info.ct, i) for i in 1:nlat]
         sintheta = [unsafe_load(info.st, i) for i in 1:nlat]
@@ -66,6 +65,9 @@ struct SHTnsSphere
         lap = [Float64(-l*(l+1)) for l in li]
 
         poisson = map( x-> (x==0) ? 0 : inv(x), lap)
+
+        # one replica per thread
+        ptrs = [priv.shtns_create_with_grid(ptr, lmax, false) for _ in 1:nthreads]
 
         return new(ptrs, ptr, info,
             info.nml, info.nml_cplx,
