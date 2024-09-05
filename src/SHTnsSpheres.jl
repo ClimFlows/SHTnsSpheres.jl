@@ -204,10 +204,10 @@ synthesis_scalar!(spat::Array{Float64}, spec::Array{ComplexF64}, sph::SHTnsSpher
 
 synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
 
-analysis_scalar!(spec::Array{ComplexF64}, spat::Array{Float64}, sph::SHTnsSphere) =
+analysis_scalar!(spec::Array{ComplexF64}, spat::In{<:Array{Float64}}, sph::SHTnsSphere) =
     analysis!(priv.spat_to_SH, sph, spec, writable(spat))
 
-analysis_scalar!(::Void, spat::AF64, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
+analysis_scalar!(::Void, spat::In{<:Array{Float64}}, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
 
 #========= vector synthesis / analysis ========#
 
