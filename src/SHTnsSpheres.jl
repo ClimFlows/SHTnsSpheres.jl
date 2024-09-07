@@ -164,11 +164,10 @@ end
 function batch(fun, sph, nk, nl)
     nthreads = length(sph.ptrs)
     @batch per=core for thread in 1:nthreads
-#    Threads.@threads for thread in 1:nthreads
         ptr = sph.ptrs[thread]
         start, stop = div(nk*(thread-1), nthreads), div(nk*thread, nthreads)
         for k in start+1:stop, l=1:nl
-            fun(ptr, k, l)
+            fun(ptr, thread, k, l)
         end
     end
 end
@@ -194,9 +193,14 @@ end
 #========= scalar synthesis / analysis ========#
 
 function transform!(fun, sph, spec::Array{ComplexF64}, spat::Array{Float64})
-    batch(sph, size(spec,2), size(spec,3)) do ptr, k, l
+    batch(sph, size(spec,2), size(spec,3)) do ptr, _, k, l
         @views fun(ptr, spec[:,k,l], spat[:,:,k,l])
     end
+end
+
+function synthesis_scalar!(spat, spec, ptr::Ptr)
+    priv.SH_to_spat(ptr, spec, spat)
+    return spat
 end
 
 synthesis_scalar!(spat::Array{Float64}, spec::Array{ComplexF64}, sph::SHTnsSphere) =
@@ -209,27 +213,44 @@ analysis_scalar!(spec::Array{ComplexF64}, spat::In{<:Array{Float64}}, sph::SHTns
 
 analysis_scalar!(::Void, spat::In{<:Array{Float64}}, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
 
+function analysis_scalar!(spec, spat::InOut, ptr::Ptr)
+    spat = writable(spat)
+    priv.spat_to_SH(ptr, spec, spat)
+    return spec
+end
+
 #========= vector synthesis / analysis ========#
 
 function transform!(fun, sph, spec::SHTVectorSpec, spat::SHTVectorSpat)
-    batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, k, l
+    batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, _, k, l
         @views fun(ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
     end
 end
 
+function analysis_vector!(spec, spat::InOut, ptr::Ptr)
+    spat = writable(spat)
+    priv.spat_to_SHsphtor(ptr, spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
+    return spec
+end
+
 analysis_vector!(::Void, spat, sph) = analysis_vector!(similar_spec(spat, sph), spat, sph)
-analysis_vector!(spec::SHTVectorSpec, spat::InOut, sph) = analysis_vector!(spec, readable(spat), sph)
+analysis_vector!(spec::SHTVectorSpec, spat::InOut, sph::SHTnsSphere) = analysis_vector!(spec, writable(spat), sph)
 analysis_vector!(spec::SHTVectorSpec, spat::SHTVectorSpat, sph::SHTnsSphere) =
     analysis!(priv.spat_to_SHsphtor, sph, spec, spat)
 
+function synthesis_vector!(spat, spec, ptr::Ptr)
+    priv.SHsphtor_to_spat(ptr, spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
+    return spat
+end
+
 synthesis_vector!(::Void, spec, sph) = synthesis_vector!(similar_spat(spec, sph), spec, sph)
-synthesis_vector!(spat::SHTVectorSpat, spec::InOut, sph) = synthesis_vector!(spat, writable(spec), sph)
+synthesis_vector!(spat::SHTVectorSpat, spec::InOut, sph) = synthesis_vector!(spat, spec, sph)
 synthesis_vector!(spat::SHTVectorSpat, spec::SHTVectorSpec, sph::SHTnsSphere) =
     synthesis!(priv.SHsphtor_to_spat, sph, spec, spat)
 
 # spheroidal synthesis (gradient)
 function transform!(fun, sph, spec::Array{ComplexF64}, spat::SHTVectorSpat)
-    batch(sph, size(spec,2), size(spec,3)) do ptr, k, l
+    batch(sph, size(spec,2), size(spec,3)) do ptr, _, k, l
         @views fun(ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
     end
 end
@@ -241,6 +262,11 @@ synthesis_spheroidal!(::Void, spec::Matrix{ComplexF64}, sph::SHTnsSphere) =
 
 synthesis_spheroidal!(spat::SHTVectorSpat, spec::Array{ComplexF64}, sph::SHTnsSphere) =
     synthesis!(priv.SHsph_to_spat, sph, spec, spat)
+
+function synthesis_spheroidal!(spat, spec, sph::Ptr)
+    priv.SHsph_to_spat(sph, spec, spat.ucolat, spat.ulon)
+    return spat
+end
 
 #========= curl, div ========#
 
