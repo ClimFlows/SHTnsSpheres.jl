@@ -1,7 +1,7 @@
 name = "SHTnsSpheres"
 uuid = "9e5c175a-5132-4517-85a1-2957ec255f89"
 authors = ["Thomas Dubos, Zack Li"]
-version = "0.2.7"
+version = "0.2.8"
 
 [deps]
 MutatingOrNot = "6a37069a-9a67-4b2d-a34a-f09ab4b23c7c"
