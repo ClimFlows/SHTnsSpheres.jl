@@ -88,6 +88,10 @@ function shtns_create(lmax::Int, mmax::Int, mres::Int=1, norm::Int=0)
 end
 
 function SH_to_spat(ptr::SHTConfig, qlm::VC64, vr::MF64)
+    # check that arrays are contiguous
+    @assert stride(vr,1)==1
+    @assert stride(vr,2)==size(vr,1)
+    @assert stride(qlm,1)==1
     ccall(
         (:SH_to_spat, :libshtns),  # name of C function and library
         Cvoid,                     # output type
@@ -134,9 +138,17 @@ function SHsphtor_to_spat(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF
         Cvoid,                                # output type
         (SHTConfig, PC64, PC64, PF64, PF64),  # tuple of input types
         ptr, slm, tlm, vt, vp)                # arguments
+    return vt, vp
 end
 
 function spat_to_SHsphtor(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF64)
+    # check that arrays are contiguous
+    @assert stride(vt,1)==1
+    @assert stride(vt,2)==size(vt,1)
+    @assert stride(slm,1)==1
+    @assert stride(vp,1)==1
+    @assert stride(vp,2)==size(vp,1)
+    @assert stride(tlm,1)==1
     ccall(
         (:spat_to_SHsphtor, :libshtns),       # name of C function and library
         Cvoid,                                # output type
