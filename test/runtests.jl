@@ -60,7 +60,7 @@ function test_inv(sph, F=Float64)
     @test spec ≈ spec2
 
     uv = sample_vector!(void, velocity, sph)
-    spec = analysis_vector!(void, map(copy, uv), sph) # `copy` works around bug in analysis_vector!
+    spec = analysis_vector!(void, uv, sph)
     uv2 = synthesis_vector!(void, spec, sph)
     @test uv.ulon ≈ uv2.ulon
     @test uv.ucolat ≈ uv2.ucolat
@@ -70,9 +70,7 @@ function test_batch(sph)
     # check batched transform
     # check that we can get the same result by using `batch` manually
     function test(fun, in)
-        copy(x) = Base.copy(x)
-        copy(x::NamedTuple) = map(copy, x)
-        ref = fun(void, copy(in), sph) # `copy` works around bug in analysis_vector!
+        ref = fun(void, in, sph)
 
         sim(x) = similar(x)
         sim(x::Union{Tuple, NamedTuple}) = map(sim, x)
@@ -89,7 +87,7 @@ function test_batch(sph)
             fun(slice(out), slice(in), ptr)
         end
         passed = ref ≈ out
-        @info "test_batch" fun passed
+        passed || @error "test_batch FAILED" fun
         @test passed
         return ref
     end
