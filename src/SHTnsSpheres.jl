@@ -98,8 +98,8 @@ Base.show(io::IO, sph::SHTnsSphere) =
 
 #========= allocate ========#
 
-const SHTVectorSpat{F<:Real, N} = @NamedTuple{ucolat::Array{F,N}, ulon::Array{F,N}}
-const SHTVectorSpec{F<:Real, N} = @NamedTuple{spheroidal::Array{Complex{F},N}, toroidal::Array{Complex{F},N}}
+const SHTVectorSpat{F<:Real, N, A<:StridedArray{F,N}} = @NamedTuple{ucolat::A, ulon::A}
+const SHTVectorSpec{F<:Real, N, A<:StridedArray{Complex{F},N}} = @NamedTuple{spheroidal::A, toroidal::A}
 
 Base.show(io::IO, ::Type{SHTVectorSpat{F,N}}) where {F,N} =
     print(io, "SHTVectorSpat{$F,$N}")
@@ -198,22 +198,22 @@ function transform!(fun, sph, spec::Array{ComplexF64}, spat::Array{Float64})
     end
 end
 
-function synthesis_scalar!(spat, spec, ptr::Ptr)
-    priv.SH_to_spat(ptr, spec, spat)
-    return spat
-end
-
 synthesis_scalar!(spat::Array{Float64}, spec::Array{ComplexF64}, sph::SHTnsSphere) =
     synthesis!(priv.SH_to_spat, sph, spec, spat)
 
 synthesis_scalar!(::Void, spec, sph) = synthesis_scalar!(similar_spat(spec, sph), spec, sph)
+
+function synthesis_scalar!(spat, spec, ptr::Ptr)
+    priv.SH_to_spat(ptr, spec, spat)
+    return spat
+end
 
 analysis_scalar!(spec::Array{ComplexF64}, spat::In{<:Array{Float64}}, sph::SHTnsSphere) =
     analysis!(priv.spat_to_SH, sph, spec, writable(spat))
 
 analysis_scalar!(::Void, spat::In{<:Array{Float64}}, sph::SHTnsSphere) = analysis_scalar!(similar_spec(spat, sph), spat, sph)
 
-function analysis_scalar!(spec, spat::InOut, ptr::Ptr)
+function analysis_scalar!(spec, spat::In{<:AbstractMatrix{Float64}}, ptr::Ptr)
     spat = writable(spat)
     priv.spat_to_SH(ptr, spec, spat)
     return spec
@@ -221,13 +221,16 @@ end
 
 #========= vector synthesis / analysis ========#
 
+vector_spat((vt, vp)) = (ucolat=vt, ulon=vp)
+vector_spec((slm, tlm)) = (spheroidal=slm, toroidal=tlm)
+
 function transform!(fun, sph, spec::SHTVectorSpec, spat::SHTVectorSpat)
     batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, _, k, l
         @views fun(ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
     end
 end
 
-function analysis_vector!(spec, spat::InOut, ptr::Ptr)
+function analysis_vector!(spec, spat::In{<:SHTVectorSpat}, ptr::Ptr)
     spat = writable(spat)
     priv.spat_to_SHsphtor(ptr, spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
     return spec

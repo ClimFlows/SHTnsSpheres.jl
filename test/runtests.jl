@@ -1,5 +1,5 @@
 using Test, Zygote, ForwardDiff
-using SHTnsSpheres: SHTnsSphere, void,
+using SHTnsSpheres: SHTnsSphere, void, batch,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
     sample_vector!, analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
     curl!, divergence!
@@ -53,17 +53,62 @@ scalar(x,y,z,lon,lat) = (x*y*z)^3
 
 function test_inv(sph, F=Float64)
     spat = sample_scalar!(void, scalar, sph)
-    spec = analysis_scalar!(void, copy(spat), sph) # modifies input !
-    spat2 = synthesis_scalar!(void, spec, sph) # pure
-    spec2 = analysis_scalar!(void, copy(spat2), sph) # modifies input !
+    spec = analysis_scalar!(void, spat, sph)
+    spat2 = synthesis_scalar!(void, spec, sph)
+    spec2 = analysis_scalar!(void, spat2, sph)
     @test spat ≈ spat2
     @test spec ≈ spec2
 
     uv = sample_vector!(void, velocity, sph)
-    spec = analysis_vector!(void, map(copy,uv), sph) # modifies input !
+    spec = analysis_vector!(void, map(copy, uv), sph) # `copy` works around bug in analysis_vector!
     uv2 = synthesis_vector!(void, spec, sph)
     @test uv.ulon ≈ uv2.ulon
     @test uv.ucolat ≈ uv2.ucolat
+end
+
+function test_batch(sph)
+    # check batched transform
+    # check that we can get the same result by using `batch` manually
+    function test(fun, in)
+        copy(x) = Base.copy(x)
+        copy(x::NamedTuple) = map(copy, x)
+        ref = fun(void, copy(in), sph) # `copy` works around bug in analysis_vector!
+
+        sim(x) = similar(x)
+        sim(x::Union{Tuple, NamedTuple}) = map(sim, x)
+        out = sim(ref)
+
+        depth(x::Array{Float64}) = size(x,3)
+        depth(x::Array{ComplexF64}) = size(x,2)
+        depth(x::NamedTuple) = depth(x[1])
+
+        batch(sph, depth(out), 1) do ptr, thread, k, _
+            slice(x::Array{Float64}) = @views x[:,:,k]
+            slice(x::Array{ComplexF64}) = @views x[:,k]
+            slice(x::NamedTuple) = map(slice, x)
+            fun(slice(out), slice(in), ptr)
+        end
+        passed = ref ≈ out
+        @info "test_batch" fun passed
+        @test passed
+        return ref
+    end
+
+    spat_2D = sample_scalar!(void, scalar, sph)
+    spat = similar(spat_2D, (size(spat_2D, 1), size(spat_2D,2), 10))
+    @. spat = spat_2D
+
+    spec = test(analysis_scalar!, spat)
+    spat2 = test(synthesis_scalar!, spec)
+    _ = test(analysis_scalar!, spat2)
+
+    uv_2D = sample_vector!(void, velocity, sph)
+    ucolat, ulon = similar(spat), similar(spat)
+    @. ucolat = uv_2D.ucolat
+    @. ulon = uv_2D.ulon
+    uv = (; ucolat, ulon)
+    spec = test(analysis_vector!, uv)
+    _ = test(synthesis_vector!, spec)
 end
 
 #========= Check consistency of adjoint and tangent =======#
@@ -117,7 +162,7 @@ function Y11(x,y,z,lon,lat)
 end
 
 function test_azimuthal_phase(sph)
-    xy_spat = sample_scalar!(void, Y11, sph) 
+    xy_spat = sample_scalar!(void, Y11, sph)
     xy_spec = analysis_scalar!(void, xy_spat, sph)
     l, m = 1, 1
     LM = (m * (2 * sph.lmax + 2 - (m + 1))) >> 1 + l + 1
@@ -131,6 +176,7 @@ nlat = 128
 sph = SHTnsSphere(nlat)
 @show sph
 @testset "synthesis∘analysis == identity" test_inv(sph)
+@testset "batched transforms" test_batch(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
 @testset "azimuthal phase aligned with coordinates" test_azimuthal_phase(sph)
 
