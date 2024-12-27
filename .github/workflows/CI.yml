@@ -25,7 +25,7 @@ jobs:
         version:
           - '1.8'
           - '1.9'
-          - '1.10'
+          - 'pre'
         os:
           - ubuntu-latest
         arch:
@@ -36,6 +36,11 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+          include-all-prereleases: true
+      - uses: julia-actions/julia-downgrade-compat@v1
+        if: ${{ matrix.version == '1.8' }}
+        with:
+          skip: Pkg, TOML
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
         with:
