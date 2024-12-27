@@ -1,5 +1,7 @@
 #===================== Low-level interface to SHTns ====================#
 
+const libshtns = SHTns_jll.LibSHTns_path
+
 @enum shtns_type begin
     sht_gauss=0
     sht_auto
@@ -40,7 +42,7 @@ const SHTConfig = Ptr{shtns_info}
 
 function shtns_init(flags::shtns_type, lmax::Int, mmax::Int, mres::Int, nlat::Int, nphi::Int)
     output_ptr = ccall(
-        (:shtns_init, :libshtns),              # name of C function and library
+        (:shtns_init, libshtns),              # name of C function and library
         SHTConfig,                       # output type
         (Cint, Cint, Cint, Cint, Cint, Cint),  # tuple of input types
         flags, lmax, mmax, mres, nlat, nphi)   # arguments
@@ -53,7 +55,7 @@ end
 
 function shtns_create_with_grid(base::SHTConfig, mmax::Int, nofft::Bool)
     output_ptr = ccall(
-        (:shtns_create_with_grid, :libshtns),  # name of C function and library
+        (:shtns_create_with_grid, libshtns),  # name of C function and library
         SHTConfig,                             # output type
         (SHTConfig, Cint, Cint),               # tuple of input types
         base, mmax, nofft)                     # arguments
@@ -66,7 +68,7 @@ end
 
 function shtns_set_batch(config::SHTConfig, howmany::Integer, spec_dist::Integer)
     output = ccall(
-        (:shtns_set_batch, :libshtns),   # name of C function and library
+        (:shtns_set_batch, libshtns),   # name of C function and library
         Cint,                            # output type
         (SHTConfig, Cint, Clong),  # tuple of input types
         config, howmany, spec_dist)      # arguments
@@ -76,7 +78,7 @@ end
 
 function shtns_create(lmax::Int, mmax::Int, mres::Int=1, norm::Int=0)
     output_ptr = ccall(
-        (:shtns_create, :libshtns),    # name of C function and library
+        (:shtns_create, libshtns),    # name of C function and library
         Ptr{shtns_info},               # output type
         (Cint, Cint, Cint, Cint),      # tuple of input types
         lmax, mmax, mres, norm)        # arguments
@@ -93,7 +95,7 @@ function SH_to_spat(ptr::SHTConfig, qlm::VC64, vr::MF64)
     @assert stride(vr,2)==size(vr,1)
     @assert stride(qlm,1)==1
     ccall(
-        (:SH_to_spat, :libshtns),  # name of C function and library
+        (:SH_to_spat, libshtns),  # name of C function and library
         Cvoid,                     # output type
         (SHTConfig, PC64, PF64),   # tuple of input types
         ptr, qlm, vr)              # arguments
@@ -105,7 +107,7 @@ function spat_to_SH(ptr::SHTConfig, qlm::VC64, vr::MF64)
     @assert stride(vr,2)==size(vr,1)
     @assert stride(qlm,1)==1
     ccall(
-        (:spat_to_SH, :libshtns),  # name of C function and library
+        (:spat_to_SH, libshtns),  # name of C function and library
         Cvoid,                     # output type
         (SHTConfig, PF64, PC64),   # tuple of input types
         ptr, vr, qlm)              # arguments
@@ -119,7 +121,7 @@ function SHsph_to_spat(ptr::SHTConfig, slm::VC64, vt::MF64, vp::MF64)
     @assert stride(vp,1)==1
     @assert stride(vp,2)==size(vp,1)
     ccall(
-        (:SHsph_to_spat, :libshtns),   # name of C function and library
+        (:SHsph_to_spat, libshtns),   # name of C function and library
         Cvoid,                         # output type
         (SHTConfig, PC64, PF64, PF64), # tuple of input types
         ptr, slm, vt, vp)              # arguments
@@ -134,7 +136,7 @@ function SHsphtor_to_spat(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF
     @assert stride(vp,2)==size(vp,1)
     @assert stride(tlm,1)==1
     ccall(
-        (:SHsphtor_to_spat, :libshtns),       # name of C function and library
+        (:SHsphtor_to_spat, libshtns),       # name of C function and library
         Cvoid,                                # output type
         (SHTConfig, PC64, PC64, PF64, PF64),  # tuple of input types
         ptr, slm, tlm, vt, vp)                # arguments
@@ -150,7 +152,7 @@ function spat_to_SHsphtor(ptr::SHTConfig, slm::VC64, tlm::VC64, vt::MF64, vp::MF
     @assert stride(vp,2)==size(vp,1)
     @assert stride(tlm,1)==1
     ccall(
-        (:spat_to_SHsphtor, :libshtns),       # name of C function and library
+        (:spat_to_SHsphtor, libshtns),       # name of C function and library
         Cvoid,                                # output type
         (SHTConfig, PF64, PF64, PC64, PC64),  # tuple of input types
         ptr, vt, vp, slm, tlm)                # arguments
