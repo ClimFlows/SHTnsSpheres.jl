@@ -170,6 +170,8 @@ function test_azimuthal_phase(sph)
 end
 
 
+@testset "test thread setup" shtns_use_threads()
+
 nlat = 128
 sph = SHTnsSphere(nlat)
 @show sph
