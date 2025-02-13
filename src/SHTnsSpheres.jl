@@ -19,7 +19,7 @@ Call *before* any initialization of shtns to use mutliple threads. Returns the a
     If num_threads <= 0, maximum number of threads is automatically set to the number of processors.
     If num_threads == 1, openmp will be disabled.
 """
-shtns_use_threads(n::Int=0) = ccall((:shtns_use_threads, :libshtns), Cint, (Cint,), n)
+shtns_use_threads(n::Int=0) = ccall((:shtns_use_threads, priv.libshtns), Cint, (Cint,), n)
 
 include("julia/util.jl")
 

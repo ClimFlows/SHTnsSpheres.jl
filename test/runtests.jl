@@ -1,8 +1,10 @@
 using Test, Zygote, ForwardDiff
-using SHTnsSpheres: SHTnsSphere, void, batch,
+using SHTnsSpheres: SHTnsSphere, void, batch, 
+    shtns_use_threads,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
     sample_vector!, analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
     curl!, divergence!
+
 
 Base.show(io::IO, ::Type{<:ForwardDiff.Tag}) = print(io, "Tag{...}") #src
 Base.isapprox(a::NT, b::NT) where {NT<:NamedTuple} = all(map(isapprox, a,b))
@@ -169,6 +171,8 @@ function test_azimuthal_phase(sph)
     @test imag(result) ≈ 0.0 atol=eps()
 end
 
+
+@testset "test thread setup" shtns_use_threads()
 
 nlat = 128
 sph = SHTnsSphere(nlat)
