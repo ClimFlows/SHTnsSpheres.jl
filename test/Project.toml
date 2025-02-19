@@ -7,7 +7,3 @@ ThreadPinning = "811555cd-349b-4f26-b7bc-1f208b848042"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
-Enzyme = "0.13"
-ForwardDiff = "0.10"
-SHTns_jll = "3.5"
-Zygote = "0.6"
