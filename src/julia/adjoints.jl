@@ -19,6 +19,7 @@ end
 #=================== scalar ==============#
 
 function adjoint_analysis_scalar(spec, sph)
+    spec = copy(spec)
     scale_m0!(spec, sph, 2.0)
     return nothing, synthesis_scalar!(void, spec, sph), nothing, nothing
 end
