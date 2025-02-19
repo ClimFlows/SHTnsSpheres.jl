@@ -117,7 +117,10 @@ end
 # see https://www2.atmos.umd.edu/~dkleist/docs/shtns/doc/html/vsh.html
 curl!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
     @. spec_out = spec_in.toroidal * (-sph.laplace)
+curl!(::Void, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
+    @. -spec_in.toroidal * sph.laplace
 
 divergence!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
     @. spec_out = spec_in.spheroidal * sph.laplace
-
+divergence!(::Void, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
+    @. spec_in.spheroidal * sph.laplace

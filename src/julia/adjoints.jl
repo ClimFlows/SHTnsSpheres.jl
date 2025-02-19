@@ -16,10 +16,14 @@ function scale_m0!(spec, sph, fac)
     return spec
 end
 
+rcopy(x) = copy(x)
+rcopy(::Nothing) = nothing
+rcopy(x::NamedTuple) = map(rcopy, x)
+
 #=================== scalar ==============#
 
 function adjoint_analysis_scalar(spec, sph)
-    spec = copy(spec)
+    spec = rcopy(spec)
     scale_m0!(spec, sph, 2.0)
     return nothing, synthesis_scalar!(void, spec, sph), nothing, nothing
 end
@@ -32,14 +36,9 @@ end
 
 #================= vector =================#
 
-function adjoint_synthesis_vector(uv_spat, sph)
-    spec = analysis_vector!(void, uv_spat, sph)
-    scale_m0!(spec, sph, 0.5)
-    @. spec *= -sph.laplace
-    return nothing, spec, nothing, nothing
-end
-
-function adjoint_analysis_vector((; toroidal, spheroidal), sph)
+function adjoint_analysis_vector(spec, sph)
+    spec = rcopy(spec)
+    (; toroidal, spheroidal) = spec
     if !isnothing(spheroidal)
         scale_m0!(spheroidal, sph, 2)
         @. spheroidal *= -sph.poisson
@@ -57,6 +56,13 @@ function adjoint_analysis_vector((; toroidal, spheroidal), sph)
         spat = synthesis_vector!(void, spec, sph)
     end
     return nothing, spat, nothing, nothing
+end
+
+function adjoint_synthesis_vector(uv_spat, sph)
+    spec = analysis_vector!(void, uv_spat, sph)
+    scale_m0!(spec, sph, 0.5)
+    @. spec *= -sph.laplace
+    return nothing, spec, nothing, nothing
 end
 
 function adjoint_synthesis_spheroidal(uv_spat, sph)
