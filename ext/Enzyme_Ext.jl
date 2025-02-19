@@ -11,7 +11,7 @@ using Enzyme:Const, Duplicated, Annotation, make_zero!
 using SHTnsSpheres: SHTnsSphere, void, transform!, analysis_scalar!, synthesis_scalar!
 
 function augmented_primal(
-    _,
+    ::RevConfig,
     ::Const{typeof(transform!)},
     ::Type{<:Annotation},
     fun::Const{<:Function},
@@ -24,7 +24,7 @@ function augmented_primal(
 end
 
 function reverse(
-    _,
+    ::RevConfig,
     ::Const{typeof(transform!)},
     ::Type{<:Annotation},
     ::Nothing, # tape
