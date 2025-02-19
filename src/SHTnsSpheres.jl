@@ -216,6 +216,7 @@ function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::AbstractArr
             @views fun(ptr, spec[:,k,l], spat[:,:,k,l])
         end
     end
+    return nothing
 end
 
 synthesis_scalar!(spat, spec::AbstractArray{ComplexF64}, sph::SPtr) =
@@ -235,6 +236,7 @@ function transform!(fun, sph, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{
             @views fun(ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
         end
     end
+    return nothing
 end
 
 synthesis_vector!(spat, spec::SHTVectorSpec{Float64}, sph::SPtr) =
@@ -253,6 +255,7 @@ function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::SHTVectorSp
             @views fun(ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
         end
     end
+    return nothing
 end
 
 function synthesis_spheroidal!(spat, spec::AbstractArray{ComplexF64}, sph::SPtr)
