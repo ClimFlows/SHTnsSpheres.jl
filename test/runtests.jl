@@ -1,4 +1,4 @@
-using Test, Zygote, ForwardDiff
+using Test, Zygote, ForwardDiff, Enzyme
 using SHTnsSpheres: SHTnsSphere, void, batch, 
     shtns_use_threads,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
