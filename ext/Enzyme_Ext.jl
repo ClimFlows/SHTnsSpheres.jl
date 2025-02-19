@@ -19,7 +19,6 @@ function augmented_primal(
     spec::Duplicated, 
     spat::Duplicated)
 
-    @info "In custom primal rule:" fun.val, typeof(spec.val) typeof(spat.val)
     transform!(fun.val, sph.val, spec.val, spat.val)
     return AugmentedReturn(nothing, nothing, nothing)
 end
@@ -34,7 +33,6 @@ function reverse(
     spec::Duplicated, 
     spat::Duplicated)
 
-    @info "In custom reverse rule:" fun.val typeof(spec.dval) typeof(spat.dval)
     adjoint_transform(fun.val, sph.val, spec, spat)
     return (nothing, nothing, nothing, nothing)
 end

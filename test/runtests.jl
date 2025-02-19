@@ -26,7 +26,6 @@ function check_gradient(fun, state, dstate, args...)
     loss(s) = sum(abs2, fun(s, args...))
     fwd_grad = ForwardDiff.derivative(x->loss(@. state + x * dstate), 0.0)
     zyg_grad = dot(Zygote.gradient(loss, copy(state))[1], dstate)
-#    enz_grad = dot(Enzyme.gradient(Reverse, Const(loss), copy(state))[1], dstate)
     Rev = Enzyme.set_runtime_activity(Reverse)
     enz_grad = dot(Enzyme.gradient(Rev, Const(loss), copy(state))[1], dstate)
 
