@@ -21,11 +21,11 @@ Enzyme_Ext = ["Enzyme"]
 
 [compat]
 Enzyme = "0.13"
-ForwardDiff = "0.10.23" # 2022 version
+ForwardDiff = "0.10"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
 SHTns_jll = "3.5"
-Zygote = "0.6.34" # 2022 version
+Zygote = "0.7"
 julia = "1.8"
 
 [extras]
