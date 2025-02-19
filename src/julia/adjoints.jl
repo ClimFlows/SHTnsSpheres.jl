@@ -60,8 +60,11 @@ end
 
 function adjoint_synthesis_vector(uv_spat, sph)
     spec = analysis_vector!(void, uv_spat, sph)
-    scale_m0!(spec, sph, 0.5)
-    @. spec *= -sph.laplace
+    (; toroidal, spheroidal) = spec
+    scale_m0!(toroidal, sph, 0.5)
+    scale_m0!(spheroidal, sph, 0.5)
+    @. toroidal *= -sph.laplace
+    @. spheroidal *= -sph.laplace
     return nothing, spec, nothing, nothing
 end
 

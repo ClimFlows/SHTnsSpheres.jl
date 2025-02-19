@@ -133,7 +133,7 @@ function test_AD(sph, F=Float64)
     end
 
     check_gradient(spec, dspec) do fspec
-        u, v = synthesis_spheroidal!(void, fspec, sph)
+        u, v = synthesis_vector!(void, (spheroidal=fspec, toroidal=fspec), sph)
         k = @. u^2+v^2
         analysis_scalar!(void, k, sph)
     end
