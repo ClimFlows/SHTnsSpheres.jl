@@ -6,7 +6,7 @@
 [![Coverage](https://codecov.io/gh/ClimFlows/SHTnsSpheres.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ClimFlows/SHTnsSpheres.jl)
 
 Interface to the [SHTns](https://nschaeff.bitbucket.io/shtns/) spherical harmonics library.
-Provides [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) tangents and [Zygote](https://github.com/FluxML/Zygote.jl) adjoints.
+Compatible with forward differentiation by [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) and backward differentiation with [Zygote](https://github.com/FluxML/Zygote.jl) and [Enzyme](https://github.com/EnzymeAD/Enzyme.jl).
 
 ## Installation
 

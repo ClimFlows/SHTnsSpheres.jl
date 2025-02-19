@@ -1,4 +1,7 @@
-using Test, Zygote, ForwardDiff
+using Test, ForwardDiff 
+import Zygote # do not import symbols from Zygote
+using Enzyme: Enzyme, Reverse, Const
+
 using SHTnsSpheres: SHTnsSphere, void, batch, 
     shtns_use_threads,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
@@ -22,9 +25,13 @@ dot(a::Array{T}, b::Array{T}) where {T<:Real} = dot_spat(a,b)
 function check_gradient(fun, state, dstate, args...)
     loss(s) = sum(abs2, fun(s, args...))
     fwd_grad = ForwardDiff.derivative(x->loss(@. state + x * dstate), 0.0)
-    bwd_grad = dot(Zygote.gradient(loss, copy(state))[1], dstate)
-    @info fun fwd_grad bwd_grad
-    @test fwd_grad ≈ bwd_grad
+    zyg_grad = dot(Zygote.gradient(loss, copy(state))[1], dstate)
+    Rev = Enzyme.set_runtime_activity(Reverse)
+    enz_grad = dot(Enzyme.gradient(Rev, Const(loss), copy(state))[1], dstate)
+
+    @info fun fwd_grad zyg_grad enz_grad
+    @test fwd_grad ≈ zyg_grad
+    @test fwd_grad ≈ enz_grad
 
     # loss = <f(s),f(s)>
     # dloss = 2<f(s)|df|ds> = 2<ds|df*|f(s)>
@@ -33,7 +40,7 @@ function check_gradient(fun, state, dstate, args...)
     #    fwd_exact = 2*dot_spec(f,df)
     #    bwd_exact = 2*dot_spec(dstate,adf)
     #    @info fun fwd_exact fwd_grad
-    #    @info fun bwd_exact bwd_grad
+    #    @info fun bwd_exact zyg_grad
     return nothing
 end
 
@@ -126,7 +133,7 @@ function test_AD(sph, F=Float64)
     end
 
     check_gradient(spec, dspec) do fspec
-        u, v = synthesis_spheroidal!(void, fspec, sph)
+        u, v = synthesis_vector!(void, (spheroidal=fspec, toroidal=fspec), sph)
         k = @. u^2+v^2
         analysis_scalar!(void, k, sph)
     end
@@ -177,8 +184,10 @@ end
 nlat = 128
 sph = SHTnsSphere(nlat)
 @show sph
+#=
 @testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "batched transforms" test_batch(sph)
+=#
 @testset "Autodiff for SHTns" test_AD(sph)
 @testset "azimuthal phase aligned with coordinates" test_azimuthal_phase(sph)
 

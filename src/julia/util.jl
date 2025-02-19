@@ -15,10 +15,10 @@ ifvoid(x::Void, f, args) = f(args...)
 """
 Wraps data to mark it as writeable.
 """
-struct InOut{A}
+struct Writable{A}
     data::A
 end
-const In{T} = Union{T, InOut{T}}
+const In{T} = Union{T, Writable{T}}
 
 """
     y = erase(x)
@@ -27,15 +27,15 @@ and remain pure. Passing `erase(x)` as input argument is equivalent to passing `
 that it explicitly allows to modify the contents of `x`, thus avoiding
 copying and allocating.
 """
-erase(x) = InOut(x)
-erase(x::InOut) = x
+erase(x) = Writable(x)
+erase(x::Writable) = x
 
 """ Unwrap input argument. Used internally when we can promise that x will not be modified."""
 readable(x) = x
-readable(x::InOut) = x.data
+readable(x::Writable) = x.data
 
 """ Unwrap input argument. Used internally when we cannot promise that x will not be modified."""
 writable(x) = copy_input(x)
-writable(x::InOut) = x.data
+writable(x::Writable) = x.data
 copy_input(x) = copy(x)
 copy_input(x::NamedTuple) = map(copy, x)

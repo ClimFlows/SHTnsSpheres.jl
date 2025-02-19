@@ -25,6 +25,12 @@ include("julia/util.jl")
 
 #==================================================================#
 
+"""
+  sph = SHTnsSphere(nlat, nthreadsThreads.nthreads())
+
+Returns a SHTnsSphere corresponding to a lat-lon mesh of size nlat×2nlat
+and spectral truncation 2nlat/3 (i.e. T21 and 32×64 for nlat=32)
+"""
 struct SHTnsSphere
     ptrs     :: Vector{priv.SHTConfig} # multi-thread
     ptr      :: priv.SHTConfig
@@ -111,7 +117,7 @@ similar_spec!(::Void, x, sph) = similar_spec(x, sph)
 similar_spat!(y, x, sph) = y
 similar_spat!(::Void, x, sph) = similar_spat(x, sph)
 
-similar_spec(x::InOut, sph) = similar_spec(readable(x), sph)
+similar_spec(x::Writable, sph) = similar_spec(readable(x), sph)
 similar_spec(::AbstractMatrix{F}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph)
 similar_spec(a::AbstractArray{F, 3}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph, size(a,3))
 similar_spec(a::AbstractArray{F, 4}, sph) where F = shtns_alloc(F, Val(:scalar_spec), sph, size(a,3), size(a,4))
@@ -119,7 +125,7 @@ similar_spec(::SHTVectorSpat{F,2}, sph) where F = shtns_alloc(F, Val(:vector_spe
 similar_spec(a::SHTVectorSpat{F,3}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph, size(a.ucolat, 3))
 similar_spec(a::SHTVectorSpat{F,4}, sph) where F = shtns_alloc(F, Val(:vector_spec), sph, size(a.ucolat, 3), size(a.ucolat,4))
 
-similar_spat(x::InOut, sph) = similar_spat(readable(x), sph)
+similar_spat(x::Writable, sph) = similar_spat(readable(x), sph)
 similar_spat(::AbstractVector{Complex{F}}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph)
 similar_spat(a::AbstractMatrix{Complex{F}}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph, size(a,2))
 similar_spat(a::AbstractArray{Complex{F},3}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph, size(a,2), size(a,3))
@@ -152,125 +158,8 @@ function sample_vector!(::Void, ulonlat, sph::SHTnsSphere)
     return (; ucolat, ulon)
 end
 
-#============ higher-dimensional transforms ===========#
-
-# analysis_XXX!  -> analysis!  -> transform! ( -> batch ) -> low-level function
-# synthesis_XXX! -> synthesis! -> transform! ( -> batch ) -> low-level function
-
-function analysis!(fun::Fun, sph, spec, spat) where Fun
-    spat = writable(spat)
-    spec = similar_spec!(spec, spat, sph)
-    @assert extra_axes(spec) == extra_axes(spat) "$(extra_axes(spec)) != $(extra_axes(spat))"
-    transform!(fun, sph, spec, spat)
-    return spec
-end
-
-function synthesis!(fun::Fun, sph, spec, spat) where Fun
-    spat = similar_spat!(spat, spec, sph)
-    @assert extra_axes(spec) == extra_axes(spat)
-    transform!(fun, sph, spec, spat)
-    return spat
-end
-
-function batch(fun, sph, nk, nl)
-    nthreads = length(sph.ptrs)
-    @batch per=core for thread in 1:nthreads
-        ptr = sph.ptrs[thread]
-        start, stop = div(nk*(thread-1), nthreads), div(nk*thread, nthreads)
-        for k in start+1:stop, l=1:nl
-            fun(ptr, thread, k, l)
-        end
-    end
-end
-
-extra_axes(spec::SHTVectorSpec) = extra_axes(spec.toroidal, spec.spheroidal)
-extra_axes(spat::SHTVectorSpat) = extra_axes(spat.ucolat, spat.ulon)
-
-function extra_axes(a, b)
-    @assert extra_axes(a) == extra_axes(b) "$(extra_axes(a)) != $(extra_axes(b))"
-    return extra_axes(a)
-end
-
-function extra_axes(spec::AbstractArray{ComplexF64})
-    @assert ndims(spec) <= 3 "$(ndims(spec))>3"
-    return axes(spec,2), axes(spec, 3)
-end
-
-function extra_axes(spat::AbstractArray{Float64})
-    @assert ndims(spat) <= 4 "$(ndims(spat))>4"
-    return axes(spat,3), axes(spat, 4)
-end
-
-get_ptr(sph::SHTnsSphere) = sph.ptr
-get_ptr(ptr::Ptr{priv.shtns_info}) = ptr
-
-const SPtr = Union{SHTnsSphere, Ptr{priv.shtns_info}}
-
-#========= scalar synthesis / analysis ========#
-
-function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::AbstractArray{Float64})
-    if length(spec) == size(spec, 1)
-        fun(get_ptr(sph), spec, spat)
-    else # batched transform
-        batch(sph, size(spec,2), size(spec,3)) do ptr, _, k, l
-            @views fun(ptr, spec[:,k,l], spat[:,:,k,l])
-        end
-    end
-end
-
-synthesis_scalar!(spat, spec::AbstractArray{ComplexF64}, sph::SPtr) =
-    synthesis!(priv.SH_to_spat, sph, spec, spat)
-
-analysis_scalar!(spec, spat::In{<:AbstractArray{Float64}}, sph::SPtr) =
-    analysis!(priv.spat_to_SH, sph, spec, spat)
-
-#========= vector synthesis / analysis ========#
-
-function transform!(fun, sph, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{Float64})
-    @assert axes(spec.toroidal) == axes(spec.spheroidal)
-    if length(spec.toroidal) == size(spec.toroidal, 1)
-        fun(get_ptr(sph), spec.spheroidal, spec.toroidal, spat.ucolat, spat.ulon)
-    else
-        batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, _, k, l
-            @views fun(ptr, spec.spheroidal[:,k,l], spec.toroidal[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
-        end
-    end
-end
-
-synthesis_vector!(spat, spec::SHTVectorSpec{Float64}, sph::SPtr) =
-    synthesis!(priv.SHsphtor_to_spat, sph, spec, spat)
-
-analysis_vector!(spec, spat::In{<:SHTVectorSpat{Float64}}, sph::SPtr) =
-    analysis!(priv.spat_to_SHsphtor, sph, spec, spat)
-
-#===================== gradient synthesis ==========================#
-
-function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::SHTVectorSpat)
-    if length(spec) == size(spec, 1)
-        fun(get_ptr(sph), spec, spat.ucolat, spat.ulon)
-    else
-        batch(sph, size(spec,2), size(spec,3)) do ptr, _, k, l
-            @views fun(ptr, spec[:,k,l], spat.ucolat[:,:,k,l], spat.ulon[:,:,k,l])
-        end
-    end
-end
-
-function synthesis_spheroidal!(spat, spec::AbstractArray{ComplexF64}, sph::SPtr)
-    if spat isa Void
-        spat = (ucolat = similar_spat(spec, sph), ulon=similar_spat(spec, sph))
-    end
-    synthesis!(priv.SHsph_to_spat, sph, spec, spat)
-end
-
-#========= curl, div ========#
-
-# due to SHTns sign convention, ζ=-ΔT with T the toroidal component
-# see https://www2.atmos.umd.edu/~dkleist/docs/shtns/doc/html/vsh.html
-curl!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
-    @. spec_out = spec_in.toroidal * (-sph.laplace)
-
-divergence!(spec_out, spec_in::NamedTuple{(:spheroidal, :toroidal)}, sph::SHTnsSphere) =
-    @. spec_out = spec_in.spheroidal * sph.laplace
+include("julia/transforms.jl")
+include("julia/adjoints.jl")
 
 #========== for Julia <1.9 ==========#
 
