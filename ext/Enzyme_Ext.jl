@@ -15,7 +15,7 @@ function augmented_primal(
     ::Const{typeof(transform!)},
     ::Type{<:Annotation},
     fun::Const{<:Function},
-    sph::Const{SHTnsSphere},
+    sph::Annotation{<:SHTnsSphere},
     spec::Duplicated, 
     spat::Duplicated)
 
@@ -29,7 +29,7 @@ function reverse(
     ::Type{<:Annotation},
     ::Nothing, # tape
     fun::Const{<:Function},
-    sph::Const{SHTnsSphere},
+    sph::Annotation{<:SHTnsSphere},
     spec::Duplicated, 
     spat::Duplicated)
 
