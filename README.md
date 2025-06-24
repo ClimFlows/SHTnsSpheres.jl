@@ -1,9 +1,10 @@
 # SHTnsSpheres
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ClimFlows.github.io/SHTnsSpheres.jl/stable/)
+<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ClimFlows.github.io/SHTnsSpheres.jl/stable/) -->
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ClimFlows.github.io/SHTnsSpheres.jl/dev/)
 [![Build Status](https://github.com/ClimFlows/SHTnsSpheres.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/ClimFlows/SHTnsSpheres.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/ClimFlows/SHTnsSpheres.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ClimFlows/SHTnsSpheres.jl)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ClimFlows/SHTnsSpheres.jl)
 
 Interface to the [SHTns](https://nschaeff.bitbucket.io/shtns/) spherical harmonics library.
 Compatible with forward differentiation by [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) and backward differentiation with [Zygote](https://github.com/FluxML/Zygote.jl) and [Enzyme](https://github.com/EnzymeAD/Enzyme.jl).
