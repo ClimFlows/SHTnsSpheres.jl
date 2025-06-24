@@ -1,7 +1,7 @@
 name = "SHTnsSpheres"
 uuid = "9e5c175a-5132-4517-85a1-2957ec255f89"
 authors = ["Thomas Dubos, Zack Li"]
-version = "0.2.12"
+version = "0.2.13"
 
 [deps]
 MutatingOrNot = "6a37069a-9a67-4b2d-a34a-f09ab4b23c7c"
@@ -24,7 +24,7 @@ Enzyme = "0.13"
 ForwardDiff = "0.10"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
-SHTns_jll = "3.5"
+SHTns_jll = "<3.7.0" #v3.7.0 interacts poorly with CUDA
 Zygote = "0.7"
 julia = "1.8"
 
