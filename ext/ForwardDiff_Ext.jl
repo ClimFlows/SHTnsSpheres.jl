@@ -1,7 +1,7 @@
 module ForwardDiff_Ext
 
 import SHTnsSpheres:
-    Void, void, In,
+    Void, void, In, Writable, erase,
     similar_spec, similar_spat, shtns_alloc,
     analysis_scalar!, synthesis_scalar!,
     analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
@@ -14,10 +14,11 @@ using ForwardDiff: Dual, Partials
 const DualF64{D,T,N} = Array{Dual{T,Float64,N},D}
 const DualC64{D,T,N} = Array{Complex{Dual{T,Float64,N}},D}
 
-const ScalarSpat{T,N} = DualF64{2,T,N}
-const ScalarSpec{T,N} = DualC64{1,T,N}
-const VectorSpat{T,N} = @NamedTuple{ucolat::DualF64{2,T,N}, ulon::DualF64{2,T,N}}
-const VectorSpec{T,N} = @NamedTuple{spheroidal::DualC64{1,T,N}, toroidal::DualC64{1,T,N}}
+const MaybeErase{T} = Union{T, Writable{T}}
+const ScalarSpat{T,N} = MaybeErase{DualF64{2,T,N}}
+const ScalarSpec{T,N} = MaybeErase{DualC64{1,T,N}}
+const VectorSpat{T,N} = MaybeErase{@NamedTuple{ucolat::DualF64{2,T,N}, ulon::DualF64{2,T,N}}}
+const VectorSpec{T,N} = MaybeErase{@NamedTuple{spheroidal::DualC64{1,T,N}, toroidal::DualC64{1,T,N}}}
 
 tag(::ScalarSpat{T}) where T = T
 tag(::ScalarSpec{T}) where T = T
@@ -30,10 +31,12 @@ tag(::VectorSpec{T}) where T = T
 value(x::Complex{<:Dual}) = complex(x.re.value, x.im.value)
 value(x::Dual) = x.value
 value(x::Array) = value.(x)
+value(x::Writable) = value(x.data)
 
 partial(x::Dual{T,V,1}) where {T,V} = x.partials.values[1]
 partial(x::Complex{Dual{T,V,1}}) where {T,V} = complex(x.re.partials.values[1], x.im.partials.values[1])
 partial(x::Array) = partial.(x)
+partial(x::Writable) = partial(x.data)
 
 value(uv::NamedTuple) = map(value, uv)
 partial(uv::NamedTuple) = map(partial, uv)
