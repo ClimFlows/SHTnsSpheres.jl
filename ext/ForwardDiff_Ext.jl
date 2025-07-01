@@ -40,6 +40,14 @@ partial(x::Array) = partial.(x)
 partial(uv::NamedTuple) = map(partial, uv)
 partial(x::Writable) = partial(x.data)
 
+# since we allocate arrays for values and partials, we can mark them as writable and avoid a few allocations
+marker(x::Array) = marker(eltype(x))
+marker(x::NamedTuple) = marker(eltype(x[1]))
+marker(::Type{<:Complex}) = identity # do nothing for spectral data
+marker(::Type{<:Real}) = erase # mark spatial data as eraseable
+unmark(x::Writable) = x.data
+unmark(x) = x
+
 # recombine value and partial into Dual or Complex{Dual}
 struct Dualizer{T} end
 (::Dualizer{T})(v::V, p::V) where {T,V<:Real} = Dual{T,V,1}(v, Partials{1,V}((p,)))
@@ -52,9 +60,10 @@ dual(T::Type, v::A, p::A) where {A<:Array} = map(Dualizer{T}(), v, p)
 dual(T::Type, v::NT, p::NT) where {NT<:NamedTuple} = map(dual(T), v, p)
 
 function apply(fun!, arg, sph)
-    # we allocate arrays for values and partials => we can mark them as writable
-    v = fun!(void, erase(value(arg)), sph)
-    p = fun!(void, erase(partial(arg)), sph)
+    arg = unmark(arg)
+    mark = marker(arg)
+    v = fun!(void, mark(value(arg)), sph)
+    p = fun!(void, mark(partial(arg)), sph)
     return dual(tag(arg), v, p)
 end
 
@@ -78,8 +87,10 @@ end
 function apply!(val::Val, fun!, output, input, sph)
     v = shtns_alloc(Float64, val, sph) # values
     p = shtns_alloc(Float64, val, sph) # partial
-    fun!(v, value(input), sph)
-    fun!(p, partial(input), sph)
+    input = unmark(input)
+    mark = marker(input)
+    fun!(v, marker(value(input)), sph)
+    fun!(p, marker(partial(input)), sph)
     dual!(tag(input), output, v, p)
     return output
 end
