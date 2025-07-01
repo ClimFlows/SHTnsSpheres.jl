@@ -31,15 +31,14 @@ tag(::VectorSpec{T}) where T = T
 value(x::Complex{<:Dual}) = complex(x.re.value, x.im.value)
 value(x::Dual) = x.value
 value(x::Array) = value.(x)
+value(uv::NamedTuple) = map(value, uv)
 value(x::Writable) = value(x.data)
 
 partial(x::Dual{T,V,1}) where {T,V} = x.partials.values[1]
 partial(x::Complex{Dual{T,V,1}}) where {T,V} = complex(x.re.partials.values[1], x.im.partials.values[1])
 partial(x::Array) = partial.(x)
-partial(x::Writable) = partial(x.data)
-
-value(uv::NamedTuple) = map(value, uv)
 partial(uv::NamedTuple) = map(partial, uv)
+partial(x::Writable) = partial(x.data)
 
 # recombine value and partial into Dual or Complex{Dual}
 struct Dualizer{T} end
@@ -53,8 +52,9 @@ dual(T::Type, v::A, p::A) where {A<:Array} = map(Dualizer{T}(), v, p)
 dual(T::Type, v::NT, p::NT) where {NT<:NamedTuple} = map(dual(T), v, p)
 
 function apply(fun!, arg, sph)
-    v = fun!(void, value(arg), sph)
-    p = fun!(void, partial(arg), sph)
+    # we allocate arrays for values and partials => we can mark them as writable
+    v = fun!(void, erase(value(arg)), sph)
+    p = fun!(void, erase(partial(arg)), sph)
     return dual(tag(arg), v, p)
 end
 
