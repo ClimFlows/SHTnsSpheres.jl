@@ -1,7 +1,7 @@
 module ForwardDiff_Ext
 
 import SHTnsSpheres:
-    Void, void, In,
+    Void, void, In, Writable, erase,
     similar_spec, similar_spat, shtns_alloc,
     analysis_scalar!, synthesis_scalar!,
     analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
@@ -14,10 +14,11 @@ using ForwardDiff: Dual, Partials
 const DualF64{D,T,N} = Array{Dual{T,Float64,N},D}
 const DualC64{D,T,N} = Array{Complex{Dual{T,Float64,N}},D}
 
-const ScalarSpat{T,N} = DualF64{2,T,N}
-const ScalarSpec{T,N} = DualC64{1,T,N}
-const VectorSpat{T,N} = @NamedTuple{ucolat::DualF64{2,T,N}, ulon::DualF64{2,T,N}}
-const VectorSpec{T,N} = @NamedTuple{spheroidal::DualC64{1,T,N}, toroidal::DualC64{1,T,N}}
+const MaybeErase{T} = Union{T, Writable{T}}
+const ScalarSpat{T,N} = MaybeErase{DualF64{2,T,N}}
+const ScalarSpec{T,N} = MaybeErase{DualC64{1,T,N}}
+const VectorSpat{T,N} = MaybeErase{@NamedTuple{ucolat::DualF64{2,T,N}, ulon::DualF64{2,T,N}}}
+const VectorSpec{T,N} = MaybeErase{@NamedTuple{spheroidal::DualC64{1,T,N}, toroidal::DualC64{1,T,N}}}
 
 tag(::ScalarSpat{T}) where T = T
 tag(::ScalarSpec{T}) where T = T
@@ -30,13 +31,22 @@ tag(::VectorSpec{T}) where T = T
 value(x::Complex{<:Dual}) = complex(x.re.value, x.im.value)
 value(x::Dual) = x.value
 value(x::Array) = value.(x)
+value(uv::NamedTuple) = map(value, uv)
+value(x::Writable) = value(x.data)
 
 partial(x::Dual{T,V,1}) where {T,V} = x.partials.values[1]
 partial(x::Complex{Dual{T,V,1}}) where {T,V} = complex(x.re.partials.values[1], x.im.partials.values[1])
 partial(x::Array) = partial.(x)
-
-value(uv::NamedTuple) = map(value, uv)
 partial(uv::NamedTuple) = map(partial, uv)
+partial(x::Writable) = partial(x.data)
+
+# since we allocate arrays for values and partials, we can mark them as writable and avoid a few allocations
+marker(x::Array) = marker(eltype(x))
+marker(x::NamedTuple) = marker(eltype(x[1]))
+marker(::Type{<:Complex}) = identity # do nothing for spectral data
+marker(::Type{<:Real}) = erase # mark spatial data as eraseable
+unmark(x::Writable) = x.data
+unmark(x) = x
 
 # recombine value and partial into Dual or Complex{Dual}
 struct Dualizer{T} end
@@ -50,8 +60,10 @@ dual(T::Type, v::A, p::A) where {A<:Array} = map(Dualizer{T}(), v, p)
 dual(T::Type, v::NT, p::NT) where {NT<:NamedTuple} = map(dual(T), v, p)
 
 function apply(fun!, arg, sph)
-    v = fun!(void, value(arg), sph)
-    p = fun!(void, partial(arg), sph)
+    arg = unmark(arg)
+    mark = marker(arg)
+    v = fun!(void, mark(value(arg)), sph)
+    p = fun!(void, mark(partial(arg)), sph)
     return dual(tag(arg), v, p)
 end
 
@@ -64,27 +76,32 @@ synthesis_spheroidal!(::Void, spec::ScalarSpec, sph) = apply(synthesis_spheroida
 
 #==================== mutating ================#
 
-dual!(T) = (out,v,p)->dual!(T,out,v,p)
-dual!(T::Type, out::A, v, p) where {A<:Array} = map!(Dualizer{T}(), out, v, p)
-function dual!(T::Type, out::SHTVectorSpec, v::SHTVectorSpec, p::SHTVectorSpec)
+dual!(::Type{T}) where T = (out,v,p)->dual!(T,out,v,p)
+dual!(::Type{T}, out::Array, v, p) where T = map!(Dualizer{T}(), out, v, p)
+function dual!(::Type{T}, out::SHTVectorSpec, v::SHTVectorSpec, p::SHTVectorSpec) where T
     dual!(T, out.toroidal, v.toroidal, p.toroidal)
     dual!(T, out.spheroidal, v.spheroidal, p.spheroidal)
+    return out
+end
+function dual!(::Type{T}, out::SHTVectorSpat, v::SHTVectorSpat, p::SHTVectorSpat) where T
+    dual!(T, out.ucolat, v.ucolat, p.ucolat)
+    dual!(T, out.ulon, v.ulon, p.ulon)
     return out
 end
 
 function apply!(val::Val, fun!, output, input, sph)
     v = shtns_alloc(Float64, val, sph) # values
     p = shtns_alloc(Float64, val, sph) # partial
-    fun!(v, value(input), sph)
-    fun!(p, partial(input), sph)
+    input = unmark(input)
+    mark = marker(input)
+    fun!(v, mark(value(input)), sph)
+    fun!(p, mark(partial(input)), sph)
     dual!(tag(input), output, v, p)
     return output
 end
 
 analysis_scalar!(spec::ScalarSpec, spat::ScalarSpat, sph) =
     apply!(Val(:scalar_spec), analysis_scalar!, spec, spat, sph)
-# analysis_scalar!(::Void, spat::ScalarSpat, sph) =
-#    apply!(Val(:scalar_spec), analysis_scalar!, similar_spec(spat, sph), spat, sph)
 
 analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =
     apply!(Val(:vector_spec), analysis_vector!, spec, spat, sph)
@@ -92,13 +109,10 @@ analysis_vector!(spec::VectorSpec, spat::VectorSpat, sph) =
 synthesis_scalar!(spat::ScalarSpat, spec::ScalarSpec, sph) =
     apply!(Val(:scalar_spat), synthesis_scalar!, spat, spec, sph)
 
-# synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph) =
-#    apply!(Val(:vector_spat), synthesis_vector!, spat, spec, sph)
+synthesis_vector!(spat::VectorSpat, spec::VectorSpec, sph) =
+    apply!(Val(:vector_spat), synthesis_vector!, spat, spec, sph)
 
 synthesis_spheroidal!(spat::VectorSpat, spec::ScalarSpec, sph) =
     apply!(Val(:vector_spat), synthesis_spheroidal!, spat, spec, sph)
-
-# synthesis_spheroidal!(::Void, spec::ScalarSpec, sph) =
-#    apply!(Val(:vector_spat), synthesis_spheroidal!, similar_spat(spec, sph), spec, sph)
 
 end

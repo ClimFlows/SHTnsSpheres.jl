@@ -4,6 +4,7 @@ using Zygote: @adjoint
 using SHTnsSpheres: void, Void, Writable, Adjoints
 
 import SHTnsSpheres: 
+    erase,
     analysis_scalar!,
     analysis_vector!,
     synthesis_scalar!,
@@ -20,11 +21,13 @@ protect(x) = x
 
 #=================== scalar ==============#
 
-isvoid(::Void, fun) = void
-isvoid(storage, fun) = throw(ArgumentError("""
+isvoid(out::Void, fun) = out
+isvoid(out, fun) = throw(ArgumentError("""
     For reverse AD of SHTnsSpheres with Zygote, only non-mutating functions are supported.
-    `SHTnsSpheres.$(fun)` has been called with non-void first argument of type `$(typeof(storage))`. Please make sure the first argument is `void` or <:Void`.
+    `SHTnsSpheres.$(fun)` has been called with non-void first argument of type `$(typeof(out))`. Please make sure the first argument is `void` or <:Void`.
     """))
+
+@adjoint erase(x) = x, dx -> (dx,) # do not mark data as writable => erase == identity
 
 @adjoint analysis_scalar!(out, spat, sph) =
     analysis_scalar!(isvoid(out, analysis_scalar!), protect(spat), sph),

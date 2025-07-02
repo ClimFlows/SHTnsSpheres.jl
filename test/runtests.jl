@@ -2,8 +2,9 @@ using Test, ForwardDiff
 import Zygote # do not import symbols from Zygote
 using Enzyme: Enzyme, Reverse, Const
 
-using SHTnsSpheres: SHTnsSphere, void, batch, 
+using SHTnsSpheres: SHTnsSphere, void, batch,
     shtns_use_threads,
+    similar_spat, erase,
     sample_scalar!, synthesis_scalar!, analysis_scalar!,
     sample_vector!, analysis_vector!, synthesis_vector!, synthesis_spheroidal!,
     curl!, divergence!
@@ -29,18 +30,19 @@ function check_gradient(fun, state, dstate, args...)
     Rev = Enzyme.set_runtime_activity(Reverse)
     enz_grad = dot(Enzyme.gradient(Rev, Const(loss), copy(state))[1], dstate)
 
-    @info fun fwd_grad zyg_grad enz_grad
+    @info "check_gradient" fun fwd_grad zyg_grad enz_grad
     @test fwd_grad ≈ zyg_grad
     @test fwd_grad ≈ enz_grad
+    return nothing
+end
 
-    # loss = <f(s),f(s)>
-    # dloss = 2<f(s)|df|ds> = 2<ds|df*|f(s)>
-    #    f = fun(state)
-    #    f, df, adf = fun(state, dstate, f)
-    #    fwd_exact = 2*dot_spec(f,df)
-    #    bwd_exact = 2*dot_spec(dstate,adf)
-    #    @info fun fwd_exact fwd_grad
-    #    @info fun bwd_exact zyg_grad
+function check_gradient!(fun, state, dstate, args...)
+    loss(s) = sum(abs2, fun(s, args...))
+    fwd_grad = ForwardDiff.derivative(x->loss(@. state + x * dstate), 0.0)
+    Rev = Enzyme.set_runtime_activity(Reverse)
+    enz_grad = dot(Enzyme.gradient(Rev, Const(loss), copy(state))[1], dstate)
+    @info "check_gradient!" fun fwd_grad enz_grad
+    @test fwd_grad ≈ enz_grad
     return nothing
 end
 
@@ -127,9 +129,23 @@ function test_AD(sph, F=Float64)
     spec = analysis_scalar!(void, spat, sph)
     dspec = analysis_scalar!(void, dspat, sph)
 
+    check_gradient!(spec, dspec) do fspec
+        fspat = similar_spat(fspec, sph)
+        synthesis_scalar!(fspat, fspec, sph)
+        return analysis_scalar!(void, erase(fspat.^2), sph)
+    end
+
     check_gradient(spec, dspec) do fspec
         fspat = synthesis_scalar!(void, fspec, sph)
         return analysis_scalar!(void, fspat.^2, sph)
+    end
+
+    check_gradient!(spec, dspec) do fspec
+        uvspec = (spheroidal=fspec, toroidal=fspec)
+        u, v = uv = similar_spat(uvspec, sph)
+        synthesis_vector!(uv, uvspec, sph)
+        k = @. u^2+v^2
+        return analysis_scalar!(void, erase(k), sph)
     end
 
     check_gradient(spec, dspec) do fspec
@@ -157,8 +173,6 @@ function test_AD(sph, F=Float64)
     end
 
 end
-
-
 
 #========= Check the phase of the spherical harmonics on one example =======#
 
@@ -188,6 +202,7 @@ sph = SHTnsSphere(nlat)
 @testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "batched transforms" test_batch(sph)
 =#
+test_AD(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
 @testset "azimuthal phase aligned with coordinates" test_azimuthal_phase(sph)
 
