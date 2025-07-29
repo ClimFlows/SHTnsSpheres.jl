@@ -92,7 +92,7 @@ function transform!(fun, sph, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{
         batch(sph, size(spec.toroidal,2), size(spec.toroidal,3)) do ptr, _, k, l
             @views fun(ptr, 
                 spec.spheroidal[:,k,l], spec.toroidal[:,k,l], 
-                op_spat(spat.ucolat[:,:,k,l]), op_spat(spat.ulon[:,:,k,l]))
+                op(spat.ucolat[:,:,k,l]), op(spat.ulon[:,:,k,l]))
         end
     end
     return nothing
