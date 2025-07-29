@@ -198,12 +198,13 @@ end
 nlat = 128
 sph = SHTnsSphere(nlat)
 @show sph
-#=
+
 @testset "synthesis∘analysis == identity" test_inv(sph)
 @testset "batched transforms" test_batch(sph)
-=#
+
 test_AD(sph)
 @testset "Autodiff for SHTns" test_AD(sph)
+
 @testset "azimuthal phase aligned with coordinates" test_azimuthal_phase(sph)
 
 include("scaling.jl")
