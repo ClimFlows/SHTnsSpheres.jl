@@ -37,7 +37,7 @@ jobs:
           arch: ${{ matrix.arch }}
           include-all-prereleases: true
       - uses: julia-actions/julia-downgrade-compat@v2
-        if: ${{ matrix.version == '1.9' }}
+        if: ${{ matrix.version == '1.10' }}
         with:
           skip: Pkg, TOML
       - uses: julia-actions/cache@v2
