@@ -36,6 +36,12 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
           include-all-prereleases: true
+      - name: Add private registry
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.Registry.add()
+          Pkg.Registry.add(RegistrySpec(url = "https://github.com/ClimFlows/JuliaRegistry.git"))
       - uses: julia-actions/julia-downgrade-compat@v2
         if: ${{ matrix.version == '1.10' }}
         with:
