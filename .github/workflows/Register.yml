@@ -1,0 +1,12 @@
+name: Auto-Register new version
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    uses: ClimFlows/.github/.github/workflows/auto-tag.yml@main
+    secrets: inherit
