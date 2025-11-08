@@ -14,9 +14,19 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-#  test:
-#    uses: ClimFlows/.github/.github/workflows/test.yml@main
-#    secrets: inherit
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.10'
+          - '1.11'
+    uses: ClimFlows/.github/.github/workflows/test.yml@main
+    with:
+      version: ${{ matrix.version }} 
+    secrets: inherit
+
   docs:
     uses: ClimFlows/.github/.github/workflows/docs.yml@main
     with: 
