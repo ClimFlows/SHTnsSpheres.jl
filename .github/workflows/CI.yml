@@ -14,11 +14,11 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test:
-    uses: ClimFlows/.github/.github/workflows/test.yml@main
-    secrets: inherit
-#  docs:
-#    uses: ClimFlows/.github/.github/workflows/docs.yml@main
-#    with: 
-#      package: SHTnsSpheres
+#  test:
+#    uses: ClimFlows/.github/.github/workflows/test.yml@main
 #    secrets: inherit
+  docs:
+    uses: ClimFlows/.github/.github/workflows/docs.yml@main
+    with: 
+      package: SHTnsSpheres
+    secrets: inherit
