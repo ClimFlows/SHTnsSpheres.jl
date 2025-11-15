@@ -21,7 +21,7 @@ Enzyme_Ext = ["Enzyme"]
 
 [compat]
 Enzyme = "0.13"
-ForwardDiff = "0.10"
+ForwardDiff = "0.10, 1"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
 SHTns_jll = "<3.7.0" #v3.7.0 interacts poorly with CUDA
