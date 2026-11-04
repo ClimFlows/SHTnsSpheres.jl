@@ -38,4 +38,12 @@ readable(x::Writable) = x.data
 writable(x) = copy_input(x)
 writable(x::Writable) = x.data
 copy_input(x) = copy(x)
+function copy_input(x::Array{<:Number})
+    # Keep element types visible to Enzyme when differentiating the copy.
+    y = similar(x)
+    for i in eachindex(x, y)
+        @inbounds y[i] = x[i]
+    end
+    return y
+end
 copy_input(x::NamedTuple) = map(copy, x)
