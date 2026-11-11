@@ -63,6 +63,43 @@ xy_spec = analysis_scalar!(void, xy_spat, sphere)
 xy_spec = analysis_scalar!(xy_spec, erase(xy_spat), sphere)
 ```
 
+## CUDA transforms
+
+Load CUDA.jl and pass the path to a CUDA-enabled SHTns shared library
+with the SHTns 3.7 ABI. The CPU package continues to use its own SHTns_jll
+dependency. The GPU library and its CUDA runtime dependencies must be
+loadable on the system.
+
+```julia
+using CUDA
+using SHTnsSpheres: SHTnsSphere, cuda_plan, analysis_scalar!, synthesis_scalar!, void
+
+sphere = SHTnsSphere(32)
+library = ENV["SHTNS_CUDA_LIBRARY"]
+
+for T in (Float64, Float32)
+    cuda_plan(sphere, T; library) do plan
+        field = CuArray(T.(sphere.x))
+        coefficients = analysis_scalar!(void, field, plan)
+        reconstructed = synthesis_scalar!(void, coefficients, plan)
+    end
+end
+```
+
+Create and use a plan on the same CUDA context and stream. The calls
+synchronize that stream before returning. If you create a plan outside a
+`do` block, call `close(plan)` when finished.
+
+The transforms accept dense, unpadded `CuArray` fields with latitude
+first. Use `batch=N` when the product of the trailing dimensions is
+`N`. The corresponding coefficient arrays have the spectral index
+first, followed by the same trailing dimensions. Scalar and vector
+analysis accept `erase(input)` to permit SHTns to overwrite the input.
+Passing output buffers avoids allocating the outputs.
+
+To run the GPU tests, set `SHTNS_CUDA_LIBRARY` and run `test/cuda.jl`
+in a Julia environment containing this package and CUDA.jl.
+
 ## Automatic differentiation (AD)
 
 `SHTnsSpheres` works with ForwardDiff (forward AD) and `Zygote` (reverse AD).

@@ -158,6 +158,15 @@ function sample_vector!(::Void, ulonlat, sph::SHTnsSphere)
     return (; ucolat, ulon)
 end
 
+"""
+    cuda_plan(sphere::SHTnsSphere, [Float64]; library, batch=1)
+
+Create a Float64 or Float32 transform plan on the active CUDA device. Requires loading
+CUDA.jl and the path to a CUDA-enabled SHTns library (3.7 ABI). Use the plan with CuArray inputs
+and call `close(plan)` to release its resources.
+"""
+function cuda_plan end
+
 include("julia/transforms.jl")
 include("julia/adjoints.jl")
 
