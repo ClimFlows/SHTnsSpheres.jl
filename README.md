@@ -16,6 +16,23 @@ Compatible with forward differentiation by [ForwardDiff](https://github.com/Juli
 ] add SHTnsSpheres
 ```
 
+### CPU-only environments
+
+The default `SHTnsSphere(nlat)` uses the CPU. SHTns_jll 3.7.0 pulls in
+`CUDA_Runtime_jll` as a package dependency, even when you only use CPU
+transforms. CUDA.jl itself is optional.
+
+To keep CUDA runtime packages out of an environment that only needs
+SHTnsSpheres on the CPU, use the following commands in Julia's package mode:
+
+```text
+add SHTns_jll@3.6.6
+pin SHTns_jll
+```
+
+SHTns_jll 3.6.6 supports CPU transforms and has no CUDA runtime dependency.
+Pinning it keeps future updates from selecting 3.7.0.
+
 ## Using `SHTnsSpheres`
 
 Following the principle that *explicit is better than implicit*, `SHTnsSpheres` does not export symbols. You can discover available symbols with TAB completion in the REPL.
@@ -62,6 +79,40 @@ xy_spec = analysis_scalar!(void, xy_spat, sphere)
 # mutating, non-allocating but fills xy_spat with garbage
 xy_spec = analysis_scalar!(xy_spec, erase(xy_spat), sphere)
 ```
+
+## CUDA transforms
+
+Load CUDA.jl in an environment where SHTns_jll 3.7 selects a CUDA
+artifact. On hosts where CUDA.jl selects CUDA 13 automatically, run
+`CUDA.set_runtime_version!(v"12.9")` in the project and restart Julia
+before loading SHTnsSpheres. CUDA 12.9 was verified on NVIDIA Blackwell.
+Select the backend when constructing the sphere and use the usual
+transform functions.
+
+```julia
+using CUDA
+using SHTnsSpheres: SHTnsSphere, analysis_scalar!, synthesis_scalar!, void
+
+sphere = SHTnsSphere(32; backend=:cuda, precision=Float32)
+try
+    coefficients = analysis_scalar!(void, sphere.x, sphere)
+    reconstructed = synthesis_scalar!(void, coefficients, sphere)
+finally
+    close(sphere)
+end
+```
+
+CUDA defaults to Float64. Create and use the sphere on the same CUDA
+context and stream. Calls synchronize that stream before returning.
+
+CUDA transforms accept dense, unpadded `CuArray` fields with latitude
+first. Set `batch=N` at construction when the product of the trailing
+dimensions is `N`. Coefficient arrays have the spectral index first,
+followed by the same trailing dimensions. The existing preallocated
+output and `erase(input)` conventions apply.
+
+Run `test/cuda.jl` in an environment containing CUDA.jl and a
+CUDA-enabled SHTns_jll to verify the GPU path.
 
 ## Automatic differentiation (AD)
 

@@ -26,12 +26,16 @@ include("julia/util.jl")
 #==================================================================#
 
 """
-  sph = SHTnsSphere(nlat, nthreadsThreads.nthreads())
+    SHTnsSphere(nlat, nthreads=Threads.nthreads(); backend=:cpu, precision=Float64, batch=1)
 
 Returns a SHTnsSphere corresponding to a lat-lon mesh of size nlat×2nlat
-and spectral truncation 2nlat/3 (i.e. T21 and 32×64 for nlat=32)
+and spectral truncation 2nlat/3 (i.e. T21 and 32×64 for nlat=32).
+Load CUDA.jl to select `backend=:cuda`, optionally with `precision=Float32`
+and `batch` equal to the number of fields in a transform. Close CUDA spheres
+with `close(sph)` when finished.
 """
-struct SHTnsSphere
+struct SHTnsSphere{B,M,V}
+    backend  :: B
     ptrs     :: Vector{priv.SHTConfig} # multi-thread
     ptr      :: priv.SHTConfig
     info     :: priv.shtns_info
@@ -45,18 +49,29 @@ struct SHTnsSphere
     nspat    :: Int     # number of real numbers that must be allocated in a spatial field.
     li       :: Vector{Int} # degree l for given mode index (size nlm) : li[lm]
     mi       :: Vector{Int} # order m for given mode index (size nlm) : li[lm]
-    x        :: Matrix{Float64} # cos(lon)*sin(theta) array (size nlat*2nlat)
-    y        :: Matrix{Float64} # sin(lon)*sin(theta) ""
-    z        :: Matrix{Float64} # cos(theta)          ""
-    lon      :: Matrix{Float64} # longitude           ""
-    lat      :: Matrix{Float64} # latitude            ""
+    x        :: M # cos(lon)*sin(theta) array (size nlat*2nlat)
+    y        :: M # sin(lon)*sin(theta) ""
+    z        :: M # cos(theta)          ""
+    lon      :: M # longitude           ""
+    lat      :: M # latitude            ""
 
-    laplace  :: Vector{Float64} # eigenvalues of Laplace operator
-    poisson  :: Vector{Float64} # eigenvalues of Poisson operator
+    laplace  :: V # eigenvalues of Laplace operator
+    poisson  :: V # eigenvalues of Poisson operator
 
-    function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads())
+    function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads();
+                         backend::Symbol=:cpu, precision::Type=Float64, batch::Int=1)
         lmax = div(2nlat, 3)
-        ptr = priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat)
+        state, ptr, ptrs = create_backend(Val(backend), precision, nlat, lmax, nthreads, batch)
+        try
+            return SHTnsSphere(state, ptr, ptrs)
+        catch
+            state === nothing || close(state)
+            rethrow()
+        end
+    end
+
+    function SHTnsSphere(state, ptr::priv.SHTConfig, ptrs::Vector{priv.SHTConfig})
+        nlat = Int(unsafe_load(ptr).nlat)
         info = unsafe_load(ptr,1)
         costheta = [unsafe_load(info.ct, i) for i in 1:nlat]
         sintheta = [unsafe_load(info.st, i) for i in 1:nlat]
@@ -72,10 +87,10 @@ struct SHTnsSphere
 
         poisson = map( x-> (x==0) ? 0 : inv(x), lap)
 
-        # one replica per thread
-        ptrs = [priv.shtns_create_with_grid(ptr, lmax, false) for _ in 1:nthreads]
+        x, y, sinlat, lon, lat, lap, poisson =
+            map(a -> backend_array(state, a), (x, y, sinlat, lon, lat, lap, poisson))
 
-        return new(ptrs, ptr, info,
+        return new{typeof(state),typeof(x),typeof(lap)}(state, ptrs, ptr, info,
             info.nml, info.nml_cplx,
             info.lmax, info.mmax,
             info.nlat, info.nlat_padded,
@@ -83,11 +98,11 @@ struct SHTnsSphere
             li, mi, x, y, sinlat, lon, lat, lap, poisson)
     end
 
-    function SHTnsSphere(sph::SHTnsSphere, nthreads::Int)
+    function SHTnsSphere(sph::SHTnsSphere{Nothing,M,V}, nthreads::Int) where {M,V}
         @assert nthreads <= length(sph.ptrs)
         ptrs = sph.ptrs[1:nthreads]
         info = sph.info
-        return new(ptrs, sph.ptr, info,
+        return new{Nothing,M,V}(nothing, ptrs, sph.ptr, info,
                    info.nml, info.nml_cplx,
                    info.lmax, info.mmax,
                    info.nlat, info.nlat_padded,
@@ -98,6 +113,19 @@ struct SHTnsSphere
     end
 
 end
+
+function create_backend(::Val{:cpu}, precision, nlat, lmax, nthreads, batch)
+    precision === Float64 || throw(ArgumentError("CPU transforms require Float64"))
+    batch == 1 || throw(ArgumentError("CPU spheres infer batch size from their inputs"))
+    ptr = priv.shtns_init(priv.sht_gauss, lmax, lmax, 1, nlat, 2nlat)
+    ptrs = [priv.shtns_create_with_grid(ptr, lmax, false) for _ in 1:nthreads]
+    return nothing, ptr, ptrs
+end
+
+create_backend(::Val{:cuda}, precision, nlat, lmax, nthreads, batch) =
+    throw(ArgumentError("Load CUDA.jl and select Float64 or Float32 for CUDA transforms"))
+
+backend_array(::Nothing, a) = a
 
 Base.show(io::IO, sph::SHTnsSphere) =
     print(io, "SHTns_sphere(T$(sph.lmax), nlon=$(sph.nlon), nlat=$(sph.nlat))")
@@ -131,6 +159,8 @@ similar_spat(a::AbstractMatrix{Complex{F}}, sph) where F = shtns_alloc(F, Val(:s
 similar_spat(a::AbstractArray{Complex{F},3}, sph) where F = shtns_alloc(F, Val(:scalar_spat), sph, size(a,2), size(a,3))
 similar_spat(::SHTVectorSpec{F,1}, sph) where F = shtns_alloc(F, Val(:vector_spat), sph)
 similar_spat(a::SHTVectorSpec{F,2}, sph) where F = shtns_alloc(F, Val(:vector_spat), sph, size(a.spheroidal, 2))
+similar_spat(a::SHTVectorSpec{F,3}, sph) where F =
+    shtns_alloc(F, Val(:vector_spat), sph, size(a.spheroidal, 2), size(a.spheroidal, 3))
 
 shtns_alloc(F, ::Val{:scalar_spec}, sph, args...) = shtns_alloc_spec(F, sph, args...)
 shtns_alloc(F, ::Val{:scalar_spat}, sph, args...) = shtns_alloc_spat(F, sph, args...)
@@ -143,8 +173,8 @@ shtns_alloc(F, ::Val{:vector_spec}, sph::SHTnsSphere, args...) = (
     spheroidal = shtns_alloc_spec(F, sph, args...),
     toroidal = shtns_alloc_spec(F, sph, args...) )
 
-shtns_alloc_spat(F, sph, dims...) = Array{F}(undef, sph.nlat, 2*sph.nlat, dims...)
-shtns_alloc_spec(F, sph, dims...) = Array{Complex{F}}(undef, sph.nml, dims...)
+shtns_alloc_spat(F, sph::SHTnsSphere, dims...) = similar(sph.x, F, sph.nlat, sph.nlon, dims...)
+shtns_alloc_spec(F, sph::SHTnsSphere, dims...) = similar(sph.laplace, Complex{F}, sph.nml, dims...)
 
 #========= sample ========#
 
