@@ -52,13 +52,13 @@ See also the [unit tests](test/runtests.jl).
 
 The spectral representation of a scalar field is a `Vector` of complex spectral coefficients. The grid representation of a scalar field is a `Matrix` of real values at grid points.
 
-The spectral representation of a vector field is a named tuple `(; toroidal, spheroidal)` of complex `Vector`s corresponding to a vector potential and streamfunction. The grid representation of a vector field is a named tuple `(; ucolat, ulon)` of real matrices storing grid-point values of vector components in colatitude, longitude coordinates.
+The spectral representation of a vector field is a named tuple `(; spheroidal, toroidal)` of complex `Vector`s for the velocity potential and streamfunction, respectively. The grid representation of a vector field is a named tuple `(; ucolat, ulon)` of real matrices storing grid-point values of vector components in colatitude, longitude coordinates.
 
 `synthesis_XX!` takes spectral coefficients and returns grid-point values. `analysis_XX!` goes in the reverse direction.
 
 ## Mutating and non-mutating variants
 
-Following julia convention, the first argument of functions whose name ends with `!` is an output argument, as in `copy!` or `mul!`. If an existing field is passed as this argument, the function call should not allocate. This is the default, mutating variant. However automatic differentiation in reverse mode prefers pure, non-mutating functions. The non-mutating variant is obtained by passing `void` as the first argument.
+Following julia convention, the first argument of functions whose name ends with `!` is an output argument, as in `copy!` or `mul!`. Passing an existing field reuses its output storage. A transform may still allocate a copy of its input. This is the default, mutating variant. However automatic differentiation in reverse mode prefers pure, non-mutating functions. The non-mutating variant is obtained by passing `void` as the first argument.
 
 ```julia
 using SHTnsSpheres: void
@@ -73,7 +73,7 @@ xy_spat = sample_scalar!(xy_spat, g, sphere)      # mutating, does not allocate
 where necessary, but this allocates. If it is acceptable for you to lose your input data, you can avoid this allocation by passing `erase(data)` as argument. `erase(data)` returns a thin wrapper around `data` that tells `SHTnsSpheres` that a copy is not required.
 
 ```julia
-using SHTnsSphere: erase
+using SHTnsSpheres: erase
 # non-mutating, allocates xy_spec, internally allocates a copy of xy_spat
 xy_spec = analysis_scalar!(void, xy_spat, sphere)
 # mutating, non-allocating but fills xy_spat with garbage
@@ -116,9 +116,15 @@ CUDA-enabled SHTns_jll to verify the GPU path.
 
 ## Automatic differentiation (AD)
 
-`SHTnsSpheres` works with ForwardDiff (forward AD) and `Zygote` (reverse AD).
+ForwardDiff supports forward AD on CPU. Zygote and Enzyme provide reverse
+rules for the transforms on CPU and CUDA. With Zygote, pass `void` as the
+output argument. Zygote preserves the input even when it is passed through
+`erase`. With Enzyme, `erase` allows the transform to overwrite the input.
 
-For reverse AD, `SHTnsSpheres` guarantees that non-mutating variants do not modify their input arguments, even if passed as `erase(data)`. Thus a copy may be made internally. This hopefully prevents silent AD errors, at the price of extra allocations.
+For CUDA reverse AD with Enzyme, use `sum(abs2.(y))` for a squared-norm
+loss to use Enzyme's rule for plain GPU sums. Run `test/cuda_enzyme.jl`
+in the CUDA test environment with Enzyme.jl installed to verify scalar
+analysis and synthesis gradients.
 
 ## Thread safety
 

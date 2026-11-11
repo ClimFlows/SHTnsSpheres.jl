@@ -129,6 +129,14 @@ function test_AD(sph, F=Float64)
     spec = analysis_scalar!(void, spat, sph)
     dspec = analysis_scalar!(void, dspat, sph)
 
+    # Check each scalar adjoint with the unweighted array dot product.
+    check_gradient(spat, dspat) do fspat
+        analysis_scalar!(void, fspat, sph)
+    end
+    check_gradient(spec, dspec) do fspec
+        synthesis_scalar!(void, fspec, sph)
+    end
+
     check_gradient!(spec, dspec) do fspec
         fspat = similar_spat(fspec, sph)
         synthesis_scalar!(fspat, fspec, sph)
