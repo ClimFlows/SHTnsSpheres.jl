@@ -52,7 +52,7 @@ See also the [unit tests](test/runtests.jl).
 
 The spectral representation of a scalar field is a `Vector` of complex spectral coefficients. The grid representation of a scalar field is a `Matrix` of real values at grid points.
 
-The spectral representation of a vector field is a named tuple `(; toroidal, spheroidal)` of complex `Vector`s corresponding to a vector potential and streamfunction. The grid representation of a vector field is a named tuple `(; ucolat, ulon)` of real matrices storing grid-point values of vector components in colatitude, longitude coordinates.
+The spectral representation of a vector field is a named tuple `(; spheroidal, toroidal)` of complex `Vector`s for the velocity potential and streamfunction, respectively. The grid representation of a vector field is a named tuple `(; ucolat, ulon)` of real matrices storing grid-point values of vector components in colatitude, longitude coordinates.
 
 `synthesis_XX!` takes spectral coefficients and returns grid-point values. `analysis_XX!` goes in the reverse direction.
 
