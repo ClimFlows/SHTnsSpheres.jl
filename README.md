@@ -120,6 +120,11 @@ CUDA-enabled SHTns_jll to verify the GPU path.
 
 For reverse AD, `SHTnsSpheres` guarantees that non-mutating variants do not modify their input arguments, even if passed as `erase(data)`. Thus a copy may be made internally. This hopefully prevents silent AD errors, at the price of extra allocations.
 
+For CUDA reverse AD with Enzyme, use `sum(abs2.(y))` for a squared-norm
+loss to use Enzyme's rule for plain GPU sums. Run `test/cuda_enzyme.jl`
+in the CUDA test environment with Enzyme.jl installed to verify scalar
+analysis and synthesis gradients.
+
 ## Thread safety
 
 At this moment `SHTnsSpheres` makes no promises regarding thread safety. Use a lock if you use the same `SHTnsSphere` object from different threads.

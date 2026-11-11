@@ -57,6 +57,7 @@ struct SHTnsSphere{B,M,V}
 
     laplace  :: V # eigenvalues of Laplace operator
     poisson  :: V # eigenvalues of Poisson operator
+    weights  :: V # quadrature weights per grid point, indexed by latitude
 
     function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads();
                          backend::Symbol=:cpu, precision::Type=Float64, batch::Int=1)
@@ -87,15 +88,22 @@ struct SHTnsSphere{B,M,V}
 
         poisson = map( x-> (x==0) ? 0 : inv(x), lap)
 
-        x, y, sinlat, lon, lat, lap, poisson =
-            map(a -> backend_array(state, a), (x, y, sinlat, lon, lat, lap, poisson))
+        half_weights = Vector{Float64}(undef, cld(nlat, 2))
+        count = ccall((:shtns_gauss_wts, priv.libshtns), Cint,
+            (priv.SHTConfig, Ptr{Float64}), ptr, half_weights)
+        count == length(half_weights) || error("SHTns did not return Gauss quadrature weights")
+        weights = vcat(half_weights, reverse(half_weights[1:fld(nlat, 2)]))
+        weights .*= 4π / (sum(weights) * info.nphi)
+
+        x, y, sinlat, lon, lat, lap, poisson, weights =
+            map(a -> backend_array(state, a), (x, y, sinlat, lon, lat, lap, poisson, weights))
 
         return new{typeof(state),typeof(x),typeof(lap)}(state, ptrs, ptr, info,
             info.nml, info.nml_cplx,
             info.lmax, info.mmax,
             info.nlat, info.nlat_padded,
             info.nphi, info.nspat,
-            li, mi, x, y, sinlat, lon, lat, lap, poisson)
+            li, mi, x, y, sinlat, lon, lat, lap, poisson, weights)
     end
 
     function SHTnsSphere(sph::SHTnsSphere{Nothing,M,V}, nthreads::Int) where {M,V}
@@ -109,7 +117,7 @@ struct SHTnsSphere{B,M,V}
                    info.nphi, info.nspat,
                    sph.li, sph.mi,
                    sph.x, sph.y, sph.z, sph.lon, sph.lat,
-                   sph.laplace, sph.poisson)
+                   sph.laplace, sph.poisson, sph.weights)
     end
 
 end
