@@ -1,9 +1,8 @@
 # Run in an environment with SHTnsSpheres and CUDA installed and a CUDA-enabled SHTns.
 using CUDA, Test
-using SHTnsSpheres: SHTnsSphere, cuda_plan, void, erase, analysis_scalar!, synthesis_scalar!
+using SHTnsSpheres: SHTnsSphere, void, erase, sample_scalar!, analysis_scalar!, synthesis_scalar!
 
 CUDA.allowscalar(false)
-const CUDA_SHTNS = ENV["SHTNS_CUDA_LIBRARY"]
 
 @testset "Scalar CUDA transforms" begin
     sph = SHTnsSphere(32, 1)
@@ -11,12 +10,17 @@ const CUDA_SHTNS = ENV["SHTNS_CUDA_LIBRARY"]
     ref = analysis_scalar!(void, x, sph)
     for (T, rtol) in ((Float64, 1e-12), (Float32, 2e-6))
         @testset "$T" begin
-            plan = cuda_plan(sph, T; library=CUDA_SHTNS)
-            d = CuArray(T.(x))
+            plan = SHTnsSphere(32; backend=:cuda, precision=T)
             try
+                d = sample_scalar!(void, (x, y, z, lon, lat) -> one(x) + x + 2z, plan)
+                @test d isa CuMatrix{T}
+                @test isapprox(Array(d), x; rtol)
+                original = Array(d)
                 q = analysis_scalar!(void, d, plan)
                 @test eltype(q) === Complex{T}
-                @test Array(d) == T.(x)
+                @test plan isa SHTnsSphere
+                @test plan.x isa CuMatrix{T}
+                @test Array(d) == original
                 @test isapprox(Array(q), ref; rtol)
                 @test isapprox(Array(synthesis_scalar!(void, CuArray(Complex{T}.(ref)), plan)), x; rtol)
                 @test analysis_scalar!(q, erase(d), plan) === q
@@ -28,7 +32,7 @@ const CUDA_SHTNS = ENV["SHTNS_CUDA_LIBRARY"]
                 close(plan)
             end
             close(plan)
-            @test_throws ArgumentError analysis_scalar!(void, d, plan)
+            @test_throws ArgumentError analysis_scalar!(void, plan.x, plan)
         end
     end
 end
@@ -44,7 +48,7 @@ using SHTnsSpheres: analysis_vector!, synthesis_vector!, synthesis_spheroidal!
     gradient = synthesis_spheroidal!(void, q, sph)
     for (T, rtol) in ((Float64, 1e-12), (Float32, 2e-6))
         @testset "$T" begin
-            plan = cuda_plan(sph, T; library=CUDA_SHTNS)
+            plan = SHTnsSphere(32; backend=:cuda, precision=T)
             try
                 d = map(x -> CuArray(T.(x)), fields)
                 c = map(x -> CuArray(Complex{T}.(x)), spec)
@@ -68,7 +72,7 @@ end
     x = cat(sph.x, sph.y, sph.z; dims=3)
     ref = analysis_scalar!(void, x, sph)
     for (T, rtol) in ((Float64, 1e-12), (Float32, 2e-6))
-        plan = cuda_plan(sph, T; library=CUDA_SHTNS, batch=3)
+        plan = SHTnsSphere(32; backend=:cuda, precision=T, batch=3)
         try
             d = CuArray(T.(x))
             q = analysis_scalar!(void, d, plan)
@@ -90,13 +94,16 @@ end
     x = sph.x
     stream = CuStream()
     CUDA.stream!(stream) do
-        cuda_plan(sph; library=CUDA_SHTNS) do plan
+        plan = SHTnsSphere(32; backend=:cuda)
+        try
             d = CuArray(x)
             q = analysis_scalar!(void, d, plan)
             @test Array(synthesis_scalar!(void, q, plan)) ≈ x
             CUDA.stream!(CuStream()) do
                 @test_throws ArgumentError synthesis_scalar!(void, q, plan)
             end
+        finally
+            close(plan)
         end
     end
 end

@@ -1,5 +1,9 @@
 #===================== Low-level interface to SHTns ====================#
 
+SHTns_jll.is_available() ||
+    error("SHTns_jll has no artifact for this platform and CUDA runtime. " *
+          "With SHTns_jll 3.7 on a CUDA 13 host, select CUDA 12.9 with " *
+          "CUDA.set_runtime_version!(v\"12.9\") and restart Julia.")
 const libshtns = SHTns_jll.LibSHTns_path
 
 @enum shtns_type begin

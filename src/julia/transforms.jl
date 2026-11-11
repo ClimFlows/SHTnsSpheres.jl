@@ -48,24 +48,26 @@ function extra_axes(a, b)
     return extra_axes(a)
 end
 
-function extra_axes(spec::AbstractArray{ComplexF64})
+function extra_axes(spec::AbstractArray{<:Complex})
     @assert ndims(spec) <= 3 "$(ndims(spec))>3"
     return axes(spec,2), axes(spec, 3)
 end
 
-function extra_axes(spat::AbstractArray{Float64})
+function extra_axes(spat::AbstractArray{<:AbstractFloat})
     @assert ndims(spat) <= 4 "$(ndims(spat))>4"
     return axes(spat,3), axes(spat, 4)
 end
 
-get_ptr(sph::SHTnsSphere) = sph.ptr
+get_ptr(sph::SHTnsSphere{Nothing}) = sph.ptr
 get_ptr(ptr::Ptr{priv.shtns_info}) = ptr
 
 const SPtr = Union{SHTnsSphere, Ptr{priv.shtns_info}}
+const TransformFloat = Union{Float32,Float64}
+const CPUSPtr = Union{SHTnsSphere{Nothing}, Ptr{priv.shtns_info}}
 
 #========= scalar synthesis / analysis ========#
 
-function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::AbstractArray{Float64}, op::Fun) where Fun
+function transform!(fun, sph::CPUSPtr, spec::AbstractArray{ComplexF64}, spat::AbstractArray{Float64}, op::Fun) where Fun
     if length(spec) == size(spec, 1)
         fun(get_ptr(sph), spec, op(spat))
     else # batched transform
@@ -76,15 +78,15 @@ function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::AbstractArr
     return nothing
 end
 
-synthesis_scalar!(spat, spec::In{<:AbstractArray{ComplexF64}}, sph::SPtr) =
+synthesis_scalar!(spat, spec::In{<:AbstractArray{<:Complex{<:TransformFloat}}}, sph::SPtr) =
     synthesis!(priv.SH_to_spat, sph, spec, spat)
 
-analysis_scalar!(spec, spat::In{<:AbstractArray{Float64}}, sph::SPtr) =
+analysis_scalar!(spec, spat::In{<:AbstractArray{<:TransformFloat}}, sph::SPtr) =
     analysis!(priv.spat_to_SH, sph, spec, spat)
 
 #========= vector synthesis / analysis ========#
 
-function transform!(fun, sph, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{Float64}, op::Fun) where Fun
+function transform!(fun, sph::CPUSPtr, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{Float64}, op::Fun) where Fun
     @assert axes(spec.toroidal) == axes(spec.spheroidal)
     if length(spec.toroidal) == size(spec.toroidal, 1)
         fun(get_ptr(sph), spec.spheroidal, spec.toroidal, op(spat.ucolat), op(spat.ulon))
@@ -98,15 +100,15 @@ function transform!(fun, sph, spec::SHTVectorSpec{Float64}, spat::SHTVectorSpat{
     return nothing
 end
 
-synthesis_vector!(spat, spec::In{<:SHTVectorSpec{Float64}}, sph::SPtr) =
+synthesis_vector!(spat, spec::In{<:SHTVectorSpec{<:TransformFloat}}, sph::SPtr) =
     synthesis!(priv.SHsphtor_to_spat, sph, spec, spat)
 
-analysis_vector!(spec, spat::In{<:SHTVectorSpat{Float64}}, sph::SPtr) =
+analysis_vector!(spec, spat::In{<:SHTVectorSpat{<:TransformFloat}}, sph::SPtr) =
     analysis!(priv.spat_to_SHsphtor, sph, spec, spat)
 
 #===================== gradient synthesis ==========================#
 
-function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::SHTVectorSpat)
+function transform!(fun, sph::CPUSPtr, spec::AbstractArray{ComplexF64}, spat::SHTVectorSpat, op)
     if length(spec) == size(spec, 1)
         fun(get_ptr(sph), spec, spat.ucolat, spat.ulon)
     else
@@ -117,7 +119,7 @@ function transform!(fun, sph, spec::AbstractArray{ComplexF64}, spat::SHTVectorSp
     return nothing
 end
 
-function synthesis_spheroidal!(spat, spec::AbstractArray{ComplexF64}, sph::SPtr)
+function synthesis_spheroidal!(spat, spec::AbstractArray{<:Complex{<:TransformFloat}}, sph::SPtr)
     if spat isa Void
         spat = (ucolat = similar_spat(spec, sph), ulon=similar_spat(spec, sph))
     end

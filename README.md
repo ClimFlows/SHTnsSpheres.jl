@@ -65,40 +65,37 @@ xy_spec = analysis_scalar!(xy_spec, erase(xy_spat), sphere)
 
 ## CUDA transforms
 
-Load CUDA.jl and pass the path to a CUDA-enabled SHTns shared library
-with the SHTns 3.7 ABI. The CPU package continues to use its own SHTns_jll
-dependency. The GPU library and its CUDA runtime dependencies must be
-loadable on the system.
+Load CUDA.jl in an environment where SHTns_jll 3.7 selects a CUDA
+artifact. On hosts where CUDA.jl selects CUDA 13 automatically, run
+`CUDA.set_runtime_version!(v"12.9")` in the project and restart Julia
+before loading SHTnsSpheres. CUDA 12.9 was verified on NVIDIA Blackwell.
+Select the backend when constructing the sphere and use the usual
+transform functions.
 
 ```julia
 using CUDA
-using SHTnsSpheres: SHTnsSphere, cuda_plan, analysis_scalar!, synthesis_scalar!, void
+using SHTnsSpheres: SHTnsSphere, analysis_scalar!, synthesis_scalar!, void
 
-sphere = SHTnsSphere(32)
-library = ENV["SHTNS_CUDA_LIBRARY"]
-
-for T in (Float64, Float32)
-    cuda_plan(sphere, T; library) do plan
-        field = CuArray(T.(sphere.x))
-        coefficients = analysis_scalar!(void, field, plan)
-        reconstructed = synthesis_scalar!(void, coefficients, plan)
-    end
+sphere = SHTnsSphere(32; backend=:cuda, precision=Float32)
+try
+    coefficients = analysis_scalar!(void, sphere.x, sphere)
+    reconstructed = synthesis_scalar!(void, coefficients, sphere)
+finally
+    close(sphere)
 end
 ```
 
-Create and use a plan on the same CUDA context and stream. The calls
-synchronize that stream before returning. If you create a plan outside a
-`do` block, call `close(plan)` when finished.
+CUDA defaults to Float64. Create and use the sphere on the same CUDA
+context and stream. Calls synchronize that stream before returning.
 
-The transforms accept dense, unpadded `CuArray` fields with latitude
-first. Use `batch=N` when the product of the trailing dimensions is
-`N`. The corresponding coefficient arrays have the spectral index
-first, followed by the same trailing dimensions. Scalar and vector
-analysis accept `erase(input)` to permit SHTns to overwrite the input.
-Passing output buffers avoids allocating the outputs.
+CUDA transforms accept dense, unpadded `CuArray` fields with latitude
+first. Set `batch=N` at construction when the product of the trailing
+dimensions is `N`. Coefficient arrays have the spectral index first,
+followed by the same trailing dimensions. The existing preallocated
+output and `erase(input)` conventions apply.
 
-To run the GPU tests, set `SHTNS_CUDA_LIBRARY` and run `test/cuda.jl`
-in a Julia environment containing this package and CUDA.jl.
+Run `test/cuda.jl` in an environment containing CUDA.jl and a
+CUDA-enabled SHTns_jll to verify the GPU path.
 
 ## Automatic differentiation (AD)
 
