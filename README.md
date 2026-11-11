@@ -16,6 +16,23 @@ Compatible with forward differentiation by [ForwardDiff](https://github.com/Juli
 ] add SHTnsSpheres
 ```
 
+### CPU-only environments
+
+The default `SHTnsSphere(nlat)` uses the CPU. SHTns_jll 3.7.0 pulls in
+`CUDA_Runtime_jll` as a package dependency, even when you only use CPU
+transforms. CUDA.jl itself is optional.
+
+To keep CUDA runtime packages out of an environment that only needs
+SHTnsSpheres on the CPU, use the following commands in Julia's package mode:
+
+```text
+add SHTns_jll@3.6.6
+pin SHTns_jll
+```
+
+SHTns_jll 3.6.6 supports CPU transforms and has no CUDA runtime dependency.
+Pinning it keeps future updates from selecting 3.7.0.
+
 ## Using `SHTnsSpheres`
 
 Following the principle that *explicit is better than implicit*, `SHTnsSpheres` does not export symbols. You can discover available symbols with TAB completion in the REPL.
