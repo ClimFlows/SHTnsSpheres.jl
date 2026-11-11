@@ -28,7 +28,7 @@ Enzyme = "0.13"
 ForwardDiff = "0.10, 1"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
-SHTns_jll = "<3.7.0" # v3.7.0 can fail to select an artifact with newer CUDA runtimes
+SHTns_jll = "3.6.6 - 3.7"
 Zygote = "0.7"
 julia = "1.8"
 
