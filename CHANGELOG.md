@@ -8,6 +8,7 @@
   CUDA stream with CUDA.jl 5.8.3 or later. Synchronization is retained for
   older CUDA.jl releases and other memory types.
 - Closing a CUDA sphere waits for its stream before releasing the plans.
+- The Enzyme extension requires Enzyme 0.13.24 or later in the 0.13 series.
 
 ## 0.2.19
 

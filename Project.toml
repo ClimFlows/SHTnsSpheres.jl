@@ -23,7 +23,7 @@ Enzyme_Ext = ["Enzyme"]
 
 [compat]
 CUDA = "5"
-Enzyme = "0.13"
+Enzyme = "0.13.24"
 ForwardDiff = "0.10, 1"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
