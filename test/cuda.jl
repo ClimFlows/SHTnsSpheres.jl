@@ -120,3 +120,23 @@ end
         end
     end
 end
+
+
+@testset "Asynchronous device transforms and close" begin
+    plan = SHTnsSphere(32; backend=:cuda, precision=Float32)
+    try
+        x = Array(plan.x)
+        outputs = map(1:8) do i
+            q = analysis_scalar!(void, i .* plan.x, plan)
+            y = synthesis_scalar!(void, q, plan)
+            GC.gc(false)
+            return y
+        end
+        close(plan)
+        for (i, y) in enumerate(outputs)
+            @test Array(y) ≈ i .* x rtol=2e-6
+        end
+    finally
+        close(plan)
+    end
+end

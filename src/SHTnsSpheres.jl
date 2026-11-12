@@ -43,7 +43,9 @@ dimensions after latitude and longitude for grid fields, or after the
 spectral index for coefficients. A field without trailing dimensions has
 batch size 1. CUDA plans for other sizes are created on first use and reused
 until `close(sph)` releases them. Use the sphere on the CUDA context and
-stream where it was created.
+stream where it was created. Transforms on CUDA device arrays can return
+before completion. Use `CUDA.synchronize()` to wait for the current stream,
+or `close(sph)` to wait and release the plans.
 """
 struct SHTnsSphere{B,M,V}
     backend  :: B

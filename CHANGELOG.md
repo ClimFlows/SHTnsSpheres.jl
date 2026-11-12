@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.20
+
+### Changed
+
+- Transforms on device-memory arrays enqueue asynchronously on the sphere's
+  CUDA stream with CUDA.jl 5.8.3 or later. Synchronization is retained for
+  older CUDA.jl releases and other memory types.
+- Closing a CUDA sphere waits for its stream before releasing the plans.
+
 ## 0.2.19
 
 ### Added
