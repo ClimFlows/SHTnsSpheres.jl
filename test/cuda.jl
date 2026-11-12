@@ -68,12 +68,15 @@ using SHTnsSpheres: analysis_vector!, synthesis_vector!, synthesis_spheroidal!
 end
 
 @testset "Batched CUDA transforms" begin
+    @test_throws ArgumentError SHTnsSphere(32; backend=:cuda, batch=())
+    @test_throws ArgumentError SHTnsSphere(32; backend=:cuda, batch=[1, 0])
     sph = SHTnsSphere(32, 1)
     x = cat(sph.x, sph.y, sph.z; dims=3)
     ref = analysis_scalar!(void, x, sph)
     for (T, rtol) in ((Float64, 1e-12), (Float32, 2e-6))
-        plan = SHTnsSphere(32; backend=:cuda, precision=T, batch=3)
+        plan = SHTnsSphere(32; backend=:cuda, precision=T, batch=(3, 1, 3))
         try
+            @test Set(keys(plan.backend.plans)) == Set((1, 3))
             d = CuArray(T.(x))
             q = analysis_scalar!(void, d, plan)
             @test isapprox(Array(q), ref; rtol)
@@ -82,10 +85,20 @@ end
             fields = synthesis_vector!(void, spec, plan)
             result = analysis_vector!(void, fields, plan)
             @test all(map((a, b) -> isapprox(Array(a), Array(b); rtol), result, spec))
-            @test_throws DimensionMismatch analysis_scalar!(void, CuArray(T.(sph.x)), plan)
+            d4 = reshape(cat(d, plan.x; dims=3), 32, 64, 2, 2)
+            q4 = analysis_scalar!(void, d4, plan)
+            @test size(q4) == (sph.nml, 2, 2)
+            @test isapprox(Array(synthesis_scalar!(void, q4, plan)), Array(d4); rtol)
+            cached = plan.backend.plans[4]
+            @test isapprox(Array(synthesis_scalar!(void, q, plan)), x; rtol)
+            @test isapprox(Array(synthesis_scalar!(void, q4, plan)), Array(d4); rtol)
+            @test plan.backend.plans[4] == cached
+            @test Set(keys(plan.backend.plans)) == Set((1, 3, 4))
+            @test_throws ArgumentError analysis_scalar!(void, CUDA.zeros(T, 32, 64, 0), plan)
         finally
             close(plan)
         end
+        @test isempty(plan.backend.plans)
     end
 end
 

@@ -5,20 +5,40 @@ using SHTnsSpheres: SHTnsSphere, SHTVectorSpec, SHTVectorSpat, priv
 using SHTnsSpheres.priv: SHTConfig, libshtns
 import SHTnsSpheres: create_backend, backend_array, transform!
 
-mutable struct CUDAState{T}
-    ptr::SHTConfig
+struct CUDAState{T}
+    plans::Dict{Int,SHTConfig}
     context::CUDA.CuContext
     stream::CUDA.CuStream
-    batch::Int
+    lock::ReentrantLock
 end
 
 const SHT_FP32 = Cint(256 * 1024)
 
 destroy(ptr) = ccall((:shtns_destroy, libshtns), Cvoid, (SHTConfig,), ptr)
 
+function checked_batch(batch)
+    batch isa Integer && 1 <= batch <= typemax(Cint) ||
+        throw(ArgumentError("batch size must be a positive integer that fits Cint"))
+    return Int(batch)
+end
+
 function create_backend(::Val{:cuda}, ::Type{T}, nlat, lmax, nthreads, batch) where {T<:Union{Float32,Float64}}
-    1 <= batch <= typemax(Cint) || throw(ArgumentError("batch size must be positive and fit Cint"))
-    ctx, stream = CUDA.context(), CUDA.stream()
+    batches = batch isa Union{Tuple,AbstractVector} ? batch : (batch,)
+    isempty(batches) && throw(ArgumentError("provide at least one initial batch size"))
+    sizes = unique(map(checked_batch, batches))
+    state = CUDAState{T}(Dict{Int,SHTConfig}(), CUDA.context(), CUDA.stream(), ReentrantLock())
+    try
+        for size in sizes
+            state.plans[size] = create_plan(state, nlat, lmax, size)
+        end
+        return state, state.plans[first(sizes)], SHTConfig[]
+    catch
+        close(state)
+        rethrow()
+    end
+end
+
+function create_plan(state::CUDAState{T}, nlat, lmax, batch) where T
     flags = Cint(priv.sht_gauss) | (T === Float32 ? SHT_FP32 : Cint(0))
     ptr = priv.shtns_create(lmax, lmax)
     try
@@ -32,10 +52,10 @@ function create_backend(::Val{:cuda}, ::Type{T}, nlat, lmax, nthreads, batch) wh
             info.nspat == nlat * 2nlat * batch ||
             throw(ArgumentError("SHTns CUDA requires an unpadded latitude-longitude grid"))
         ccall((:cushtns_set_streams, libshtns), Cvoid,
-            (SHTConfig, CUDA.CUstream, CUDA.CUstream), ptr, stream, C_NULL)
+            (SHTConfig, CUDA.CUstream, CUDA.CUstream), ptr, state.stream, C_NULL)
         device = ccall((:cushtns_init_gpu, libshtns), Cint, (SHTConfig,), ptr)
         device >= 0 || error("SHTns could not initialize CUDA for this grid")
-        return CUDAState{T}(ptr, ctx, stream, batch), ptr, SHTConfig[]
+        return ptr
     catch
         destroy(ptr)
         rethrow()
@@ -47,10 +67,12 @@ backend_array(::CUDAState{T}, a) where T = CuArray{T}(a)
 Base.close(sph::SHTnsSphere{<:CUDAState}) = close(sph.backend)
 
 function Base.close(state::CUDAState)
-    state.ptr == C_NULL && return nothing
-    CUDA.context!(state.context) do
-        destroy(state.ptr)
-        state.ptr = C_NULL
+    lock(state.lock) do
+        isempty(state.plans) && return
+        CUDA.context!(state.context) do
+            foreach(destroy, values(state.plans))
+            empty!(state.plans)
+        end
     end
     return nothing
 end
@@ -74,9 +96,8 @@ end
 
 function cuda_transform!(fun, sph::SHTnsSphere{CUDAState{T}}, spectra, fields) where T
     state = sph.backend
-    state.ptr != C_NULL || throw(ArgumentError("CUDA sphere is closed"))
     tail = size(first(spectra))[2:end]
-    prod(tail) == state.batch || throw(DimensionMismatch("array batch size differs from CUDA sphere"))
+    batch = checked_batch(prod(tail))
     for (arrays, type, shape) in ((spectra, Complex{T}, (sph.nml, tail...)),
                                  (fields, T, (sph.nlat, sph.nlon, tail...)))
         all(a -> a isa CuArray{type}, arrays) || throw(ArgumentError("expected CuArray{$type}"))
@@ -86,17 +107,23 @@ function cuda_transform!(fun, sph::SHTnsSphere{CUDAState{T}}, spectra, fields) w
     end
     CUDA.context() == state.context && CUDA.stream() == state.stream ||
         throw(ArgumentError("use the sphere on the CUDA context and stream where it was created"))
-    GC.@preserve spectra fields begin
-        cuda_call!(fun, state, spectra..., fields..., sph.lmax)
-        CUDA.synchronize(state.stream)
+    lock(state.lock) do
+        isempty(state.plans) && throw(ArgumentError("CUDA sphere is closed"))
+        ptr = get!(state.plans, batch) do
+            create_plan(state, sph.nlat, sph.lmax, batch)
+        end
+        GC.@preserve spectra fields begin
+            cuda_call!(fun, T, ptr, spectra..., fields..., sph.lmax)
+            CUDA.synchronize(state.stream)
+        end
     end
     return nothing
 end
 
-function cuda_call!(::typeof(priv.SHsph_to_spat), state::CUDAState{Float64}, s, vt, vp, lmax)
+function cuda_call!(::typeof(priv.SHsph_to_spat), ::Type{Float64}, ptr, s, vt, vp, lmax)
     ccall((:cu_SHsph_to_spat, libshtns), Cvoid,
         (SHTConfig, CuPtr{ComplexF64}, CuPtr{Float64}, CuPtr{Float64}, Cint),
-        state.ptr, s, vt, vp, lmax)
+        ptr, s, vt, vp, lmax)
 end
 
 for (T, suffix) in ((Float64, ""), (Float32, "_float"))
@@ -107,21 +134,21 @@ for (T, suffix) in ((Float64, ""), (Float32, "_float"))
     vector_analysis = Symbol("cu_spat_to_SHsphtor", suffix)
     vector_synthesis = Symbol("cu_SHsphtor_to_spat", suffix)
     @eval begin
-        function cuda_call!(::typeof(priv.spat_to_SH), state::CUDAState{$T}, q, v, lmax)
+        function cuda_call!(::typeof(priv.spat_to_SH), ::Type{$T}, ptr, q, v, lmax)
             ccall(($(QuoteNode(analysis)), libshtns), Cvoid,
-                (SHTConfig, $P, $C, Cint), state.ptr, v, q, lmax)
+                (SHTConfig, $P, $C, Cint), ptr, v, q, lmax)
         end
-        function cuda_call!(::typeof(priv.SH_to_spat), state::CUDAState{$T}, q, v, lmax)
+        function cuda_call!(::typeof(priv.SH_to_spat), ::Type{$T}, ptr, q, v, lmax)
             ccall(($(QuoteNode(synthesis)), libshtns), Cvoid,
-                (SHTConfig, $C, $P, Cint), state.ptr, q, v, lmax)
+                (SHTConfig, $C, $P, Cint), ptr, q, v, lmax)
         end
-        function cuda_call!(::typeof(priv.spat_to_SHsphtor), state::CUDAState{$T}, s, t, vt, vp, lmax)
+        function cuda_call!(::typeof(priv.spat_to_SHsphtor), ::Type{$T}, ptr, s, t, vt, vp, lmax)
             ccall(($(QuoteNode(vector_analysis)), libshtns), Cvoid,
-                (SHTConfig, $P, $P, $C, $C, Cint), state.ptr, vt, vp, s, t, lmax)
+                (SHTConfig, $P, $P, $C, $C, Cint), ptr, vt, vp, s, t, lmax)
         end
-        function cuda_call!(::typeof(priv.SHsphtor_to_spat), state::CUDAState{$T}, s, t, vt, vp, lmax)
+        function cuda_call!(::typeof(priv.SHsphtor_to_spat), ::Type{$T}, ptr, s, t, vt, vp, lmax)
             ccall(($(QuoteNode(vector_synthesis)), libshtns), Cvoid,
-                (SHTConfig, $C, $C, $P, $P, Cint), state.ptr, s, t, vt, vp, lmax)
+                (SHTConfig, $C, $C, $P, $P, Cint), ptr, s, t, vt, vp, lmax)
         end
     end
 end
