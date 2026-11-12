@@ -31,8 +31,9 @@ include("julia/util.jl")
 Returns a SHTnsSphere corresponding to a lat-lon mesh of size nlat×2nlat
 and spectral truncation 2nlat/3 (i.e. T21 and 32×64 for nlat=32).
 Load CUDA.jl to select `backend=:cuda`, optionally with `precision=Float32`
-and `batch` equal to the number of fields in a transform. Close CUDA spheres
-with `close(sph)` when finished.
+and `batch` set to an integer or a nonempty tuple or vector of initial batch
+sizes. CUDA plans for additional sizes are created on demand. Close CUDA
+spheres with `close(sph)` when finished.
 """
 struct SHTnsSphere{B,M,V}
     backend  :: B
@@ -60,7 +61,7 @@ struct SHTnsSphere{B,M,V}
     weights  :: V # quadrature weights per grid point, indexed by latitude
 
     function SHTnsSphere(nlat::Int, nthreads::Int=Threads.nthreads();
-                         backend::Symbol=:cpu, precision::Type=Float64, batch::Int=1)
+                         backend::Symbol=:cpu, precision::Type=Float64, batch=1)
         lmax = div(2nlat, 3)
         state, ptr, ptrs = create_backend(Val(backend), precision, nlat, lmax, nthreads, batch)
         try

@@ -106,10 +106,12 @@ CUDA defaults to Float64. Create and use the sphere on the same CUDA
 context and stream. Calls synchronize that stream before returning.
 
 CUDA transforms accept dense, unpadded `CuArray` fields with latitude
-first. Set `batch=N` at construction when the product of the trailing
-dimensions is `N`. Coefficient arrays have the spectral index first,
-followed by the same trailing dimensions. The existing preallocated
-output and `erase(input)` conventions apply.
+first. The product of the trailing dimensions determines the batch size.
+Use `batch=30` or `batch=(1, 30, 31)` at construction to prepare one or
+several plans. Each additional size is planned on first use. Plans are
+reused until `close(sphere)` releases them all. Coefficient arrays have
+the spectral index first, followed by the same trailing dimensions.
+The existing preallocated output and `erase(input)` conventions apply.
 
 Run `test/cuda.jl` in an environment containing CUDA.jl and a
 CUDA-enabled SHTns_jll to verify the GPU path.
