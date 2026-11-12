@@ -104,7 +104,12 @@ end
 ```
 
 CUDA defaults to Float64. Create and use the sphere on the same CUDA
-context and stream. Calls synchronize that stream before returning.
+context and stream. With CUDA.jl 5.8.3 or later, transforms
+on device-memory arrays enqueue work asynchronously. Subsequent work on
+the same stream is ordered after the transform. Call `CUDA.synchronize()`
+when host code needs completion. `close(sphere)` waits for the sphere's
+stream before releasing its plans. Other CUDA memory types and older
+versions use synchronous transforms.
 
 CUDA transforms accept dense, unpadded `CuArray` fields with latitude
 first. A single latitude–longitude field has batch size 1. For a field

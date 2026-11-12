@@ -12,6 +12,12 @@ struct CUDAState{T}
     lock::ReentrantLock
 end
 
+const stream_tracked_arrays = @static if isdefined(Base, :pkgversion)
+    Base.pkgversion(CUDA) >= v"5.8.3"
+else
+    false
+end
+
 const SHT_FP32 = Cint(256 * 1024)
 
 destroy(ptr) = ccall((:shtns_destroy, libshtns), Cvoid, (SHTConfig,), ptr)
@@ -70,6 +76,7 @@ function Base.close(state::CUDAState)
     lock(state.lock) do
         isempty(state.plans) && return
         CUDA.context!(state.context) do
+            CUDA.synchronize(state.stream)
             foreach(destroy, values(state.plans))
             empty!(state.plans)
         end
@@ -114,7 +121,12 @@ function cuda_transform!(fun, sph::SHTnsSphere{CUDAState{T}}, spectra, fields) w
         end
         GC.@preserve spectra fields begin
             cuda_call!(fun, T, ptr, spectra..., fields..., sph.lmax)
-            CUDA.synchronize(state.stream)
+            # CuPtr conversion tracks the current stream for CUDA-managed device memory.
+            if !stream_tracked_arrays ||
+               !all(a -> a isa CuArray{<:Any,<:Any,CUDA.DeviceMemory}, spectra) ||
+               !all(a -> a isa CuArray{<:Any,<:Any,CUDA.DeviceMemory}, fields)
+                CUDA.synchronize(state.stream)
+            end
         end
     end
     return nothing
