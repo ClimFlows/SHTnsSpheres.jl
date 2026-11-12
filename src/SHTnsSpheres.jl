@@ -28,12 +28,22 @@ include("julia/util.jl")
 """
     SHTnsSphere(nlat, nthreads=Threads.nthreads(); backend=:cpu, precision=Float64, batch=1)
 
-Returns a SHTnsSphere corresponding to a lat-lon mesh of size nlat×2nlat
-and spectral truncation 2nlat/3 (i.e. T21 and 32×64 for nlat=32).
-Load CUDA.jl to select `backend=:cuda`, optionally with `precision=Float32`
-and `batch` set to an integer or a nonempty tuple or vector of initial batch
-sizes. CUDA plans for additional sizes are created on demand. Close CUDA
-spheres with `close(sph)` when finished.
+Construct a latitude–longitude sphere with `nlat × 2nlat` grid points and
+spectral truncation `div(2nlat, 3)`.
+
+The CPU backend uses Float64 and infers the batch size from the input.
+Load CUDA.jl to select `backend=:cuda` with `precision=Float32` or
+`precision=Float64`. On CUDA, `batch` is a positive integer or a nonempty
+tuple or vector of positive integers that fit in `Cint`. It specifies which
+batch sizes to plan at construction. For example, `batch=(1, 30, 31)`
+prepares three plans.
+
+Each transform infers the batch size from the product of the trailing
+dimensions after latitude and longitude for grid fields, or after the
+spectral index for coefficients. A field without trailing dimensions has
+batch size 1. CUDA plans for other sizes are created on first use and reused
+until `close(sph)` releases them. Use the sphere on the CUDA context and
+stream where it was created.
 """
 struct SHTnsSphere{B,M,V}
     backend  :: B

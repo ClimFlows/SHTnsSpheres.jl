@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.19
+
+### Added
+
+- CUDA spheres infer the batch size from the input and cache one transform
+  plan per size. The `batch` keyword accepts an integer or a nonempty tuple or
+  vector of initial sizes. Additional sizes are planned on demand, and
+  `close(sphere)` releases all plans.
+
 ## 0.2.18
 
 ### Added

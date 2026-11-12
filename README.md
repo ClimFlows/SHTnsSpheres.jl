@@ -93,9 +93,10 @@ transform functions.
 using CUDA
 using SHTnsSpheres: SHTnsSphere, analysis_scalar!, synthesis_scalar!, void
 
-sphere = SHTnsSphere(32; backend=:cuda, precision=Float32)
+sphere = SHTnsSphere(32; backend=:cuda, precision=Float32, batch=(1, 3))
 try
-    coefficients = analysis_scalar!(void, sphere.x, sphere)
+    fields = cat(sphere.x, sphere.y, sphere.z; dims=3)
+    coefficients = analysis_scalar!(void, fields, sphere)
     reconstructed = synthesis_scalar!(void, coefficients, sphere)
 finally
     close(sphere)
@@ -106,11 +107,15 @@ CUDA defaults to Float64. Create and use the sphere on the same CUDA
 context and stream. Calls synchronize that stream before returning.
 
 CUDA transforms accept dense, unpadded `CuArray` fields with latitude
-first. The product of the trailing dimensions determines the batch size.
-Use `batch=30` or `batch=(1, 30, 31)` at construction to prepare one or
-several plans. Each additional size is planned on first use. Plans are
-reused until `close(sphere)` releases them all. Coefficient arrays have
-the spectral index first, followed by the same trailing dimensions.
+first. A single latitude–longitude field has batch size 1. For a field
+with extra dimensions, their product gives the batch size. Coefficient
+arrays have the spectral index first, followed by the same trailing
+dimensions.
+
+Use a positive integer, such as `batch=30`, or a nonempty tuple or vector
+of positive integers, such as `batch=(1, 30, 31)`, to prepare plans at
+construction. Each additional size is planned on first use. Plans are
+reused until `close(sphere)` releases them all.
 The existing preallocated output and `erase(input)` conventions apply.
 
 Run `test/cuda.jl` in an environment containing CUDA.jl and a
